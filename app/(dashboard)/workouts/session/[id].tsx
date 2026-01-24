@@ -11,11 +11,14 @@ import {
   Alert
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import { Colors } from "@/constants/Colors";
+import { Button } from "@/components/ui/Button";
 import { 
   X, 
   Clock, 
@@ -26,14 +29,18 @@ import {
   ChevronRight,
   Plus,
   Trophy,
-  Trash2
+  Trash2,
+  Check,
+  Edit3
 } from "lucide-react-native";
 import { Database } from "@/types/supabase";
 
-type Session = Database["public"]["Tables"]["workout_sessions"]["Row"];
-type SessionExercise = Database["public"]["Tables"]["session_exercises"]["Row"] & {
-  sets?: SessionSet[];
-};
+import { 
+  useWorkoutSessionDetail,
+  type FullWorkoutSession,
+  type SessionExercise,
+} from "@/hooks/useWorkoutHistory";
+
 type SessionSet = Database["public"]["Tables"]["session_sets"]["Row"];
 
 interface EditedSet {
@@ -41,92 +48,92 @@ interface EditedSet {
   weight_used: number;
   reps_completed: number;
   rpe: number | null;
+  notes?: string | null;
 }
 
 interface EditedExercise {
   id: string;
   name: string;
+  notes?: string | null;
   sets: EditedSet[];
 }
 
 export default function SessionSummaryScreen() {
-  const { id } = useLocalSearchParams();
+  const { t } = useTranslation();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editedExercises, setEditedExercises] = useState<EditedExercise[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const { data: sessionDetails, isLoading: loading } = useQuery({
-    queryKey: ['session_summary', id],
-    queryFn: async () => {
-      // 1. Fetch from workout_sessions (standard table)
-      const { data: sessionData, error: sessionError } = await supabase
-        .from("workout_sessions")
-        .select(`
-          *,
-          workouts (program)
-        `)
-        .eq("id", id)
-        .maybeSingle();
-
-      if (sessionError) throw sessionError;
-      if (!sessionData) return { session: null, exercises: [] };
-
-      // 2. Fetch exercises for this session
-      const { data: exercisesData, error: exercisesError } = await supabase
-        .from("session_exercises")
-        .select("*")
-        .eq("session_id", id)
-        .order("order_index", { ascending: true });
-
-      if (exercisesError) throw exercisesError;
-
-      let finalExercises: SessionExercise[] = [];
-      let finalSession = { ...sessionData };
-
-      if (exercisesData && exercisesData.length > 0) {
-        // 3. Fetch sets for these exercises
-        const exerciseIds = exercisesData.map(ex => ex.id);
-        const { data: setsData, error: setsError } = await supabase
-          .from("session_sets")
-          .select("*")
-          .in("session_exercise_id", exerciseIds)
-          .order("created_at", { ascending: true });
-
-        if (setsError) throw setsError;
-
-        finalExercises = exercisesData.map(ex => ({
-          ...ex,
-          sets: setsData?.filter(s => s.session_exercise_id === ex.id) || []
-        }));
-
-        // Calculate total volume if missing or 0
-        if (!sessionData.total_volume || sessionData.total_volume === 0) {
-          const calculatedVolume = (setsData || []).reduce((sum, set) => 
-            sum + ((set.weight_used || 0) * (set.reps_completed || 0)), 0
-          );
-          finalSession = { ...finalSession, total_volume: calculatedVolume };
-        }
-      }
-      
-      return { session: finalSession as any, exercises: finalExercises };
-    },
-    enabled: !!id,
-  });
+  const { data: sessionDetails, isLoading: loading } = useWorkoutSessionDetail(id!);
 
   const session = sessionDetails?.session || null;
-  const exercises = sessionDetails?.exercises || [];
+  const rawExercises = sessionDetails?.exercises || [];
+
+  // Filter out duplicate exercises and fix "double sets" bug from legacy data
+  const exercises = useMemo(() => {
+    if (!rawExercises.length) return [];
+    
+    // Helper to generate a unique key for an exercise's content
+    const getExerciseSignature = (ex: SessionExercise) => {
+      const setsSig = (ex.sets || []).map(s => 
+        `${s.weight_used}-${s.reps_completed}-${s.rpe}`
+      ).join('|');
+      return `${ex.name}:${setsSig}`; // Intentionally ignoring notes for dedupe to be aggressive on "ghost" dupes
+    };
+
+    const unique: SessionExercise[] = [];
+    const seenSignatures = new Set<string>();
+
+    for (const ex of rawExercises) {
+      // 1. Check for "Array Double" bug within sets (e.g. [A, B, A, B] or [A, B, C, A, B, C])
+      // Use a heuristic: if sets length is even, and 2nd half equals 1st half --> slice it.
+      const sets = ex.sets || [];
+      let cleanedSets = sets;
+      
+      if (sets.length >= 2 && sets.length % 2 === 0) {
+        const mid = sets.length / 2;
+        const firstHalf = sets.slice(0, mid);
+        const secondHalf = sets.slice(mid);
+        
+        const isExactDouble = firstHalf.every((s1, i) => {
+          const s2 = secondHalf[i];
+          return s1.weight_used === s2.weight_used && 
+                 s1.reps_completed === s2.reps_completed && 
+                 s1.rpe === s2.rpe;
+        });
+
+        if (isExactDouble) {
+          cleanedSets = firstHalf;
+        }
+      }
+
+      // Create a modified exercise object with cleaned sets for signature check
+      const cleanedEx = { ...ex, sets: cleanedSets };
+      const signature = getExerciseSignature(cleanedEx);
+
+      if (!seenSignatures.has(signature)) {
+        unique.push(cleanedEx);
+        seenSignatures.add(signature);
+      }
+    }
+    return unique;
+  }, [rawExercises]);
 
   const handleStartEdit = () => {
     setEditedExercises(exercises.map(ex => ({
       id: ex.id,
       name: ex.name,
+      notes: ex.notes,
       sets: (ex.sets || []).map((s: SessionSet) => ({
         id: s.id,
         weight_used: s.weight_used || 0,
         reps_completed: s.reps_completed || 0,
-        rpe: s.rpe
+        rpe: s.rpe,
+        notes: s.notes
       }))
     })));
     setIsEditing(true);
@@ -145,18 +152,35 @@ export default function SessionSummaryScreen() {
     });
   };
 
+  const handleUpdateExercise = (exIdx: number, updates: Partial<EditedExercise>) => {
+    setEditedExercises(prev => {
+      const next = [...prev];
+      next[exIdx] = { ...next[exIdx], ...updates };
+      return next;
+    });
+  };
+
   const handleSaveEdits = async () => {
     try {
       setSaving(true);
       
       // 1. Update each set in Supabase
       for (const ex of editedExercises) {
+        // Update exercise notes
+        const { error: exError } = await supabase
+          .from("session_exercises")
+          .update({ notes: ex.notes })
+          .eq("id", ex.id);
+
+        if (exError) throw exError;
+
         for (const set of ex.sets) {
           const { error } = await supabase
             .from("session_sets")
             .update({
               weight_used: set.weight_used,
               reps_completed: set.reps_completed,
+              notes: set.notes
             })
             .eq("id", set.id);
           
@@ -185,10 +209,10 @@ export default function SessionSummaryScreen() {
       queryClient.invalidateQueries({ queryKey: ['session_summary', id] });
       // await fetchSessionDetails(); // No longer needed
       setIsEditing(false);
-      Alert.alert("Tallennettu", "Muutokset tallennettu onnistuneesti (Huom: Muutokset eivät välttämättä päivity vanhaan web-näkymään).");
+      // Alert.alert(t('session_summary.save_success_title'), t('session_summary.save_success_msg'));
     } catch (error) {
       console.error("Error saving edits:", error);
-      Alert.alert("Virhe", "Muutosten tallennus epäonnistui.");
+      Alert.alert(t('profile.error'), t('session_summary.save_error'));
     } finally {
       setSaving(false);
     }
@@ -196,23 +220,22 @@ export default function SessionSummaryScreen() {
 
   const handleDelete = () => {
     Alert.alert(
-      "Poista treeni",
-      "Oletko varma, että haluat poistaa tämän treenin? Tätä toimintoa ei voi peruuttaa.",
+      t('session_summary.delete_title'),
+      t('session_summary.delete_confirm'),
       [
-        { text: "Peruuta", style: "cancel" },
+        { text: t('session_summary.cancel'), style: "cancel" },
         { 
-          text: "Poista", 
+          text: t('workouts.details.delete'), 
           style: "destructive", 
           onPress: async () => {
             try {
               const sessionId = id as string;
               console.log("[Delete] Starting deletion for session:", sessionId);
 
-              // Delete from workout_sessions
-              const { error: sessionError } = await supabase
-                .from("workout_sessions")
-                .delete()
-                .eq("id", sessionId);
+              // Delete using RPC to handle cascade logic safely
+              const { error: sessionError } = await supabase.rpc('delete_workout_session', {
+                p_session_id: sessionId
+              });
 
               if (sessionError) {
                 console.log("[Delete] Error:", sessionError.message);
@@ -231,7 +254,7 @@ export default function SessionSummaryScreen() {
               router.back();
             } catch (error) {
               console.error("[Delete] Error:", error);
-              Alert.alert("Virhe", "Treenin poisto epäonnistui.");
+              Alert.alert(t('profile.error'), t('session_summary.delete_error'));
             }
           }
         }
@@ -277,25 +300,17 @@ export default function SessionSummaryScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.contentContainer}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Treenin yhteenveto</Text>
-            {isEditing && <Text style={styles.editingLabel}>MUOKKAUS</Text>}
+            <Text style={styles.headerTitle}>{t('session_summary.title')}</Text>
+            {isEditing && (
+              <Text style={styles.editingLabel}>{t('session_summary.editing')}</Text>
+            )}
           </View>
           <View style={styles.headerButtons}>
-            {!isEditing && (
-              <>
-                <Pressable style={styles.iconButton} onPress={handleDelete}>
-                  <Trash2 color="#EF4444" size={20} />
-                </Pressable>
-                <Pressable style={styles.editButton} onPress={handleStartEdit}>
-                  <Text style={styles.editButtonText}>Muokkaa</Text>
-                </Pressable>
-              </>
-            )}
             <Pressable style={styles.closeButton} onPress={() => router.back()}>
               <X color={Colors.text.primary} size={24} />
             </Pressable>
@@ -312,37 +327,78 @@ export default function SessionSummaryScreen() {
               </View>
               <View style={styles.statLabelRow}>
                 <Clock size={12} color={Colors.text.secondary} />
-                <Text style={styles.statLabel}>KESTO</Text>
+                <Text style={styles.statLabel}>{t('session_summary.duration')}</Text>
               </View>
             </View>
 
             <View style={styles.statBlock}>
               <View style={styles.statValueRow}>
-                <Text style={[styles.statValue, { color: Colors.neon.DEFAULT }]}>{formatVolume(session?.total_volume || 0)}</Text>
+                <Text style={[styles.statValue, { color: Colors.neon.DEFAULT }]}>
+                  {formatVolume(
+                    // If we have filtered duplicates, recalculate volume to show correct value
+                    // Otherwise use stored total
+                    exercises.length !== rawExercises.length 
+                      ? exercises.reduce((sum, ex) => sum + (ex.sets || []).reduce((sSum, s) => sSum + ((s.weight_used || 0) * (s.reps_completed || 0)), 0), 0)
+                      : (session?.total_volume || 0)
+                  )}
+                </Text>
                 <Text style={styles.statUnit}>TON</Text>
               </View>
               <View style={styles.statLabelRow}>
                 <Zap size={12} color={Colors.text.secondary} />
-                <Text style={styles.statLabel}>VOLYYMI</Text>
+                <Text style={styles.statLabel}>{t('session_summary.volume')}</Text>
               </View>
             </View>
           </View>
 
           {/* Warmup/Cooldown Mockup (can be expanded if data exists) */}
+          {/* Warmup/Cooldown Info */}
           <View style={styles.badgesRow}>
-            <View style={styles.badge}>
-              <Flame size={14} color="#F97316" />
-              <Text style={styles.badgeText}>8 min</Text>
-              <View style={styles.badgeDivider} />
-              <Text style={styles.badgeSubText}>JUOKSUMAT...</Text>
-            </View>
-            <View style={styles.badge}>
-              <ThermometerSnowflake size={14} color="#60A5FA" />
-              <Text style={styles.badgeText}>10 min</Text>
-              <View style={styles.badgeDivider} />
-              <Text style={styles.badgeSubText}>JUOKSUMAT...</Text>
-            </View>
+            {/* @ts-ignore */}
+            {session?.warmup && session.warmup.duration > 0 && (
+              <View style={styles.badge}>
+                <Flame size={14} color="#F97316" />
+                {/* @ts-ignore */}
+                <Text style={styles.badgeText}>{formatDuration(session.warmup.duration * 60)} min</Text>
+                <View style={styles.badgeDivider} />
+                {/* @ts-ignore */}
+                <Text style={styles.badgeSubText}>{(session.warmup.method || 'WARMUP').toUpperCase()}</Text>
+              </View>
+            )}
+            
+            {/* @ts-ignore */}
+            {session?.cooldown && session.cooldown.duration > 0 && (
+              <View style={styles.badge}>
+                <ThermometerSnowflake size={14} color="#60A5FA" />
+                {/* @ts-ignore */}
+                <Text style={styles.badgeText}>{formatDuration(session.cooldown.duration * 60)} min</Text>
+                <View style={styles.badgeDivider} />
+                {/* @ts-ignore */}
+                <Text style={styles.badgeSubText}>{(session.cooldown.method || 'COOLDOWN').toUpperCase()}</Text>
+              </View>
+            )}
           </View>
+
+          {/* Session Notes */}
+          {session?.notes && (
+            <View style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
+               <View style={{ 
+                 flexDirection: 'row', 
+                 alignItems: 'flex-start', 
+                 gap: 8, 
+                 backgroundColor: 'rgba(255,255,255,0.03)', 
+                 padding: 12, 
+                 borderRadius: 12,
+                 borderWidth: 1,
+                 borderColor: 'rgba(255,255,255,0.05)'
+               }}>
+                 <MessageSquare size={16} color={Colors.text.secondary} style={{ marginTop: 2 }} />
+                 <Text style={{ color: Colors.text.secondary, fontSize: 14, flex: 1, lineHeight: 20 }}>
+                   {session.notes}
+                 </Text>
+               </View>
+            </View>
+          )}
 
           {/* Exercises List */}
           <View style={styles.exercisesList}>
@@ -354,7 +410,10 @@ export default function SessionSummaryScreen() {
               return (
                 <View key={exercise.id} style={styles.exerciseCard}>
                   <View style={styles.exerciseHeader}>
-                    <Text style={styles.exerciseName}>{exercise.name}</Text>
+                    <View>
+                      <Text style={styles.exerciseName}>{exercise.name}</Text>
+                    </View>
+
                     {max1RM > 0 && (
                       <View style={styles.oneRmBadge}>
                         <Text style={styles.oneRmLabel}>1RM</Text>
@@ -365,7 +424,8 @@ export default function SessionSummaryScreen() {
 
                   <View style={styles.setsList}>
                     {exercise.sets?.map((set: any, setIdx: number) => (
-                      <View key={set.id} style={styles.setRow}>
+                      <View key={set.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                      <View style={styles.setRow}>
                         <Text style={styles.setIndex}>{setIdx + 1}</Text>
                         
                         {isEditing ? (
@@ -391,6 +451,13 @@ export default function SessionSummaryScreen() {
                               />
                               <Text style={styles.inputUnitText}>reps</Text>
                             </View>
+                            <TextInput
+                                style={[styles.setEditInput, { width: 120, fontSize: 12, textAlign: 'left' }]}
+                                value={set.notes || ''}
+                                placeholder={t('session_summary.notes_placeholder')}
+                                placeholderTextColor={Colors.text.secondary}
+                                onChangeText={(text) => handleUpdateSet(exIdx, setIdx, { notes: text })}
+                              />
                           </View>
                         ) : (
                           <View style={styles.setMainInfo}>
@@ -408,13 +475,47 @@ export default function SessionSummaryScreen() {
                         )}
                         {!isEditing && <ChevronRight size={16} color={Colors.text.secondary} opacity={0.3} />}
                       </View>
+                      {/* Set Note Display */}
+                      {!isEditing && set.notes && (
+                        <View style={{ marginLeft: 30, marginTop: 4, marginBottom: 8 }}>
+                          <Text style={{ fontSize: 12, color: Colors.text.secondary, fontStyle: 'italic' }}>
+                            {set.notes}
+                          </Text>
+                        </View>
+                      )}
+                      </View>
                     ))}
                   </View>
 
-                  {!isEditing && (
-                    <Pressable style={styles.addNoteButton}>
+                  {!isEditing && (exercise as SessionExercise).notes && (
+                    <View style={styles.exerciseNoteContainer}>
+                      <View style={styles.exerciseNoteHeader}>
+                        <MessageSquare size={14} color={Colors.neon.DEFAULT} />
+                        <Text style={styles.exerciseNoteLabel}>{t('session_summary.notes') || 'Notes'}</Text>
+                      </View>
+                      <Text style={styles.exerciseNoteText}>{(exercise as SessionExercise).notes}</Text>
+                    </View>
+                  )}
+
+                  {isEditing && (
+                    <View style={styles.exerciseNoteInputContainer}>
+                      <Text style={styles.inputLabel}>{t('session_summary.exercise_notes_label') || 'Exercise Notes'}</Text>
+                      <TextInput
+                        style={styles.exerciseNoteInput}
+                        value={(exercise as EditedExercise).notes || ''}
+                        placeholder={t('session_summary.exercise_notes_placeholder') || "Add notes about this exercise..."}
+                        placeholderTextColor={Colors.text.secondary}
+                        multiline
+                        textAlignVertical="top"
+                        onChangeText={(text) => handleUpdateExercise(exIdx, { notes: text })}
+                      />
+                    </View>
+                  )}
+
+                  {!isEditing && !(exercise as SessionExercise).notes && (
+                    <Pressable style={styles.addNoteButton} onPress={() => handleStartEdit()}>
                       <Plus size={16} color={Colors.text.secondary} />
-                      <Text style={styles.addNoteText}>Lisää muistiinpano</Text>
+                      <Text style={styles.addNoteText}>{t('session_summary.add_note')}</Text>
                     </Pressable>
                   )}
                 </View>
@@ -430,7 +531,7 @@ export default function SessionSummaryScreen() {
               onPress={handleCancelEdit}
               disabled={saving}
             >
-              <Text style={styles.cancelButtonText}>Peruuta</Text>
+              <Text style={styles.cancelButtonText}>{t('session_summary.cancel')}</Text>
             </Pressable>
             <Pressable 
               style={[styles.footerButton, styles.saveButton]} 
@@ -440,22 +541,56 @@ export default function SessionSummaryScreen() {
               {saving ? (
                 <ActivityIndicator color="#000" size="small" />
               ) : (
-                <Text style={styles.saveButtonText}>Tallenna muutokset</Text>
+                <Text style={styles.saveButtonText}>{t('session_summary.save_changes')}</Text>
               )}
             </Pressable>
           </View>
         )}
+
+        {!isEditing && (
+          <View style={styles.bottomActions}>
+            <Button 
+              style={styles.startButton}
+              onPress={() => router.back()}
+            >
+              <View style={styles.startButtonContent}>
+                <Check color="#000" size={20} />
+                <Text style={styles.startButtonText}>{t('workouts.details.close_preview')}</Text>
+              </View>
+            </Button>
+
+            <View style={styles.footerButtons}>
+              <Pressable 
+                style={styles.footerBtn}
+                onPress={handleStartEdit}
+              >
+                <Edit3 color={Colors.text.secondary} size={18} />
+                <Text style={styles.footerBtnText}>{t('session_summary.edit').toUpperCase()}</Text>
+              </Pressable>
+              <View style={styles.footerDivider} />
+              <Pressable 
+                style={styles.footerBtn} 
+                onPress={handleDelete}
+              >
+                <Trash2 color="#ff4444" size={18} />
+                <Text style={[styles.footerBtnText, { color: '#ff4444' }]}>
+                  {t('workouts.details.delete')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-  container: {
+  contentContainer: {
     flex: 1,
   },
   loadingContainer: {
@@ -530,7 +665,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 120, // Increased padding to make room for bottom button
   },
   statsContainer: {
     flexDirection: "row",
@@ -752,6 +887,109 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     opacity: 0.5,
+  },
+  bottomActions: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 34, // Matches preview screen exactly
+    backgroundColor: "rgba(0,0,0,0.95)",
+    borderTopWidth: 1,
+    borderTopColor: Colors.border.default,
+  },
+  startButton: {
+    backgroundColor: Colors.neon.DEFAULT,
+    height: 56,
+    borderRadius: 16,
+    marginBottom: 0, // No margin bottom needed as paddingBottom handles it
+    shadowColor: Colors.neon.DEFAULT,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  startButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: 'center',
+    gap: 10,
+    height: '100%',
+  },
+  startButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  footerButtons: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 32,
+    marginTop: 20,
+  },
+  footerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    opacity: 0.8,
+  },
+  footerBtnText: {
+    color: Colors.text.primary,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
+  footerDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: Colors.border.default,
+  },
+  exerciseNoteContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  exerciseNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  exerciseNoteLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    letterSpacing: 0.5,
+  },
+  exerciseNoteText: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    lineHeight: 20,
+  },
+  exerciseNoteInputContainer: {
+    gap: 8,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.text.secondary,
+    marginLeft: 4,
+  },
+  exerciseNoteInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    color: Colors.text.primary,
+    fontSize: 14,
+    minHeight: 80,
   },
   editingFooter: {
     position: 'absolute',

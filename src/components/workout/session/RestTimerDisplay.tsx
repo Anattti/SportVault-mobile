@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Plus, Minus, Play, Pause } from 'lucide-react-native';
 import Animated, { 
@@ -36,6 +37,7 @@ export function RestTimerDisplay({
   onAdjust, 
   onToggle 
 }: RestTimerDisplayProps) {
+  const { t } = useTranslation();
   const progress = useSharedValue(1);
 
   useEffect(() => {
@@ -114,7 +116,7 @@ export function RestTimerDisplay({
             {formatTime(currentSeconds)}
           </Text>
           <Text style={styles.label}>
-            {isActive ? 'Lepo' : 'Valmis'}
+            {isActive ? t('session.rest_timer.rest') : t('session.rest_timer.done')}
           </Text>
         </View>
       </View>

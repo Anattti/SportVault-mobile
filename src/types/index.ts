@@ -36,4 +36,5 @@ export interface ActiveSession {
   currentSetIndex: number;
   setResults: SetResult[][];
   exercises: WorkoutExercise[];
+  exerciseNotes: Record<number, string>;
 }

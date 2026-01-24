@@ -24,6 +24,7 @@ export const Colors = {
   card: {
     DEFAULT: "rgba(255, 255, 255, 0.05)", // Darker glass for cards
     border: "rgba(255, 255, 255, 0.05)",
+    background: "#1a1a1a",
   },
   border: {
     default: "rgba(255, 255, 255, 0.1)",

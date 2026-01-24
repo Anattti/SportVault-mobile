@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
@@ -19,6 +20,7 @@ export function CalendarHeader({
   onNextMonth,
   onAddPress,
 }: CalendarHeaderProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <View style={styles.navigationContainer}>
@@ -31,7 +33,7 @@ export function CalendarHeader({
         </TouchableOpacity>
         
         <Text style={styles.monthTitle}>
-          {getMonthName(month)} {year}
+          {t(`calendar.months.${month}`)} {year}
         </Text>
         
         <TouchableOpacity

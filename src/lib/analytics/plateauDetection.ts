@@ -12,7 +12,8 @@ export interface PlateauWarning {
   lastProgression: Date | null;
   currentValue: number;
   previousBest: number;
-  suggestion: string;
+  suggestionKey: string;
+  suggestionParams?: Record<string, any>;
 }
 
 interface ExerciseHistory {
@@ -86,7 +87,7 @@ export function detectPlateaus(
         lastProgression: prDate,
         currentValue: recentE1RM,
         previousBest: prE1RM,
-        suggestion: getSuggestion(weeksSincePR, exerciseName),
+        ...getSuggestion(weeksSincePR, exerciseName),
       });
     }
   }
@@ -98,13 +99,22 @@ export function detectPlateaus(
 /**
  * Get training suggestion based on plateau duration
  */
-function getSuggestion(weeks: number, exerciseName: string): string {
+function getSuggestion(weeks: number, name: string): { suggestionKey: string; suggestionParams: any } {
   if (weeks >= 6) {
-    return `Kokeile periodisointia tai deload-viikkoa. ${exerciseName} on ollut paikallaan ${weeks} viikkoa.`;
+    return { 
+      suggestionKey: 'analytics.suggestions.deload', 
+      suggestionParams: { name, weeks } 
+    };
   } else if (weeks >= 4) {
-    return `Vaihda rep range tai lisää intensiivisyyttä (RPE). Kokeile esim. pause-toistoja.`;
+    return { 
+      suggestionKey: 'analytics.suggestions.intensity', 
+      suggestionParams: { name, weeks } 
+    };
   } else {
-    return `Lisää 1-2 apuliikettä ${exerciseName}-liikkeelle tai tarkista palautumisesi.`;
+    return { 
+      suggestionKey: 'analytics.suggestions.accessory', 
+      suggestionParams: { name, weeks } 
+    };
   }
 }
 
@@ -114,9 +124,9 @@ function getSuggestion(weeks: number, exerciseName: string): string {
 export function checkOvertrainingRisk(
   weeklySessionCounts: number[],
   weeklyVolumes: number[]
-): { atRisk: boolean; reason: string } {
+): { atRisk: boolean; reasonKey: string } {
   if (weeklySessionCounts.length < 3 || weeklyVolumes.length < 3) {
-    return { atRisk: false, reason: '' };
+    return { atRisk: false, reasonKey: '' };
   }
 
   // Check for volume spike >30% for 2+ consecutive weeks
@@ -134,7 +144,7 @@ export function checkOvertrainingRisk(
   if (consecutiveHighWeeks >= 2) {
     return {
       atRisk: true,
-      reason: 'Volyymi on kasvanut yli 30% kahtena peräkkäisenä viikkona. Harkitse deload-viikkoa.',
+      reasonKey: 'analytics.overtraining.volume_spike',
     };
   }
 
@@ -143,9 +153,9 @@ export function checkOvertrainingRisk(
   if (recentSessions.every(count => count > 6)) {
     return {
       atRisk: true,
-      reason: 'Treenifrekvenssi on korkea (>6 treeniä/viikko). Varmista riittävä palautuminen.',
+      reasonKey: 'analytics.overtraining.high_frequency',
     };
   }
-
-  return { atRisk: false, reason: '' };
+ 
+  return { atRisk: false, reasonKey: '' };
 }

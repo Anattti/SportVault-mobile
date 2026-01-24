@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet, Pressable, Modal, Text, TouchableWithoutFeedback, Animated } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import type { WorkoutExercise, SetResult } from '@/types';
@@ -50,6 +51,7 @@ export function WorkoutProgressBar({
   currentSetIndex,
   setResults
 }: WorkoutProgressBarProps) {
+  const { t } = useTranslation();
   const [selectedExerciseIndex, setSelectedExerciseIndex] = useState<number | null>(null);
 
   const renderTooltip = () => {
@@ -79,13 +81,13 @@ export function WorkoutProgressBar({
       const isRepsRed = originalReps > 0 && currentReps < originalReps - 1;
 
       if (isWeightRed || isRepsRed) {
-        if (isWeightRed) failureReasons.push(`Sarja ${setIdx + 1}: Paino ${weightDiff.toFixed(1)}kg`);
-        if (isRepsRed) failureReasons.push(`Sarja ${setIdx + 1}: Toistot ${repsDiff}`);
+        if (isWeightRed) failureReasons.push(t('session.progress.set_weight_fail', { num: setIdx + 1, diff: weightDiff.toFixed(1) }));
+        if (isRepsRed) failureReasons.push(t('session.progress.set_reps_fail', { num: setIdx + 1, diff: repsDiff }));
       }
       // Yellow: Near miss
       else if ((originalWeight > 0 && currentWeight < originalWeight) || (originalReps > 0 && currentReps < originalReps)) {
-        if (originalWeight > 0 && currentWeight < originalWeight) failureReasons.push(`Sarja ${setIdx + 1}: Paino ${weightDiff.toFixed(1)}kg`);
-        if (originalReps > 0 && currentReps < originalReps) failureReasons.push(`Sarja ${setIdx + 1}: Toistot ${repsDiff}`);
+        if (originalWeight > 0 && currentWeight < originalWeight) failureReasons.push(t('session.progress.set_weight_fail', { num: setIdx + 1, diff: weightDiff.toFixed(1) }));
+        if (originalReps > 0 && currentReps < originalReps) failureReasons.push(t('session.progress.set_reps_fail', { num: setIdx + 1, diff: repsDiff }));
       }
     });
 
@@ -101,7 +103,7 @@ export function WorkoutProgressBar({
         <TouchableWithoutFeedback onPress={() => setSelectedExerciseIndex(null)}>
           <View style={styles.modalOverlay}>
             <BlurView intensity={20} style={styles.modalContent} tint="dark">
-              <Text style={styles.modalTitle}>Tavoitteesta jääty:</Text>
+              <Text style={styles.modalTitle}>{t('session.progress.missed_goal')}</Text>
               {failureReasons.map((reason, i) => (
                 <Text key={i} style={styles.modalText}>• {reason}</Text>
               ))}

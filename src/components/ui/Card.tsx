@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     // BlurView handles background automatically
   },
   solid: {
-    backgroundColor: "rgba(24, 24, 27, 0.5)", // bg-zinc-900/50
+    backgroundColor: "hsla(240, 6%, 10%, 0.50)", // bg-zinc-900/50
   },
   header: {
     flexDirection: "column",

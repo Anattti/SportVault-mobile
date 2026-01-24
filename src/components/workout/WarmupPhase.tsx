@@ -3,7 +3,8 @@
  * Matches Next.js PWA design - shown before and after workout session
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -33,22 +34,23 @@ interface WarmupPhaseProps {
   onSkip: () => void;
 }
 
-const METHODS: { id: WarmupMethod; label: string }[] = [
-  { id: 'juoksumatto', label: 'Juoksumatto' },
-  { id: 'cross-trainer', label: 'Cross-trainer' },
-  { id: 'kuntopyora', label: 'Kuntopyörä' },
-  { id: 'soutulaite', label: 'Soutulaite' },
-  { id: 'hyppynaru', label: 'Hyppynaru' },
-  { id: 'muu', label: 'Muu' },
-];
-
-const INTENSITIES: { id: WarmupIntensity; label: string }[] = [
-  { id: 'kevyt', label: 'Kevyt' },
-  { id: 'keskitaso', label: 'Keskitaso' },
-  { id: 'raskas', label: 'Raskas' },
-];
-
 export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhaseProps) {
+  const { t } = useTranslation();
+
+  const METHODS: { id: WarmupMethod; label: string }[] = useMemo(() => [
+    { id: 'juoksumatto', label: t('session.warmup.methods.juoksumatto') },
+    { id: 'cross-trainer', label: t('session.warmup.methods.cross_trainer') },
+    { id: 'kuntopyora', label: t('session.warmup.methods.kuntopyora') },
+    { id: 'soutulaite', label: t('session.warmup.methods.soutulaite') },
+    { id: 'hyppynaru', label: t('session.warmup.methods.hyppynaru') },
+    { id: 'muu', label: t('session.warmup.methods.muu') },
+  ], [t]);
+
+  const INTENSITIES: { id: WarmupIntensity; label: string }[] = useMemo(() => [
+    { id: 'kevyt', label: t('session.warmup.intensities.kevyt') },
+    { id: 'keskitaso', label: t('session.warmup.intensities.keskitaso') },
+    { id: 'raskas', label: t('session.warmup.intensities.raskas') },
+  ], [t]);
   const [duration, setDuration] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [method, setMethod] = useState<WarmupMethod>('juoksumatto');
@@ -57,7 +59,7 @@ export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhasePr
   const [showMethodPicker, setShowMethodPicker] = useState(false);
 
   const isWarmup = type === 'warmup';
-  const title = isWarmup ? 'Alkulämmittely' : 'Loppujäähdyttely';
+  const title = isWarmup ? t('session.warmup.warmup_title') : t('session.warmup.cooldown_title');
 
   // Timer logic
   useEffect(() => {
@@ -115,7 +117,7 @@ export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhasePr
             }]} />
             <View style={styles.circleInner}>
               <Text style={styles.timerText}>{formatTime(duration)}</Text>
-              <Text style={styles.timerLabel}>Kesto</Text>
+              <Text style={styles.timerLabel}>{t('session.warmup.duration_label')}</Text>
             </View>
           </View>
         </View>
@@ -143,7 +145,7 @@ export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhasePr
           style={styles.selectorRow}
           onPress={() => setShowMethodPicker(!showMethodPicker)}
         >
-          <Text style={styles.selectorLabel}>Tapa</Text>
+          <Text style={styles.selectorLabel}>{t('session.warmup.method')}</Text>
           <View style={styles.selectorValue}>
             <Text style={styles.selectorValueText}>
               {METHODS.find(m => m.id === method)?.label}
@@ -201,10 +203,10 @@ export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhasePr
 
         {/* Notes */}
         <View style={styles.notesContainer}>
-          <Text style={styles.notesLabel}>Muistiinpanot</Text>
+          <Text style={styles.notesLabel}>{t('session.warmup.notes')}</Text>
           <TextInput
             style={styles.notesInput}
-            placeholder="Kirjoita fiilikset..."
+            placeholder={t('session.warmup.notes_placeholder')}
             placeholderTextColor="rgba(255,255,255,0.3)"
             value={notes}
             onChangeText={setNotes}
@@ -215,12 +217,12 @@ export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhasePr
         {/* Bottom Actions */}
         <View style={styles.actions}>
           <Pressable style={styles.skipButton} onPress={onSkip}>
-            <Text style={styles.skipButtonText}>Ohita</Text>
+            <Text style={styles.skipButtonText}>{t('session.warmup.skip')}</Text>
           </Pressable>
           
           <Pressable style={styles.doneButton} onPress={handleComplete}>
             <Check size={20} color="#000" />
-            <Text style={styles.doneButtonText}>Valmis</Text>
+            <Text style={styles.doneButtonText}>{t('session.warmup.done')}</Text>
           </Pressable>
         </View>
       </View>

@@ -1,6 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-native';
 import { MessageSquare, Minus, Plus } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
 import type { WorkoutExercise, WorkoutSet, SetResult } from '@/types';
 
@@ -28,15 +30,28 @@ export function ActiveExerciseCard({
   onToggleNotes,
   notesVisible,
 }: ActiveExerciseCardProps) {
+  const { t } = useTranslation();
   const currentSet = exercise.sets[setIndex];
   const totalSets = exercise.sets.length;
 
   const adjustWeight = (amount: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onWeightChange(Math.max(0, result.weight + amount));
   };
 
   const adjustReps = (amount: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onRepsChange(Math.max(0, result.reps + amount));
+  };
+
+  const handleWeightPreset = (inc: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    adjustWeight(inc);
+  };
+
+  const handleRepPreset = (rep: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onRepsChange(rep);
   };
 
   return (
@@ -59,7 +74,7 @@ export function ActiveExerciseCard({
              </Pressable>
           )}
           <View style={styles.setsBadge}>
-            <Text style={styles.setsText}>Sarja {setIndex + 1}/{totalSets}</Text>
+            <Text style={styles.setsText}>{t('session.exercise_card.set_num', { num: setIndex + 1 })}/{totalSets}</Text>
           </View>
         </View>
       </View>
@@ -67,8 +82,8 @@ export function ActiveExerciseCard({
       {/* 1RM Badge */}
       {oneRM && (
         <View style={styles.oneRmBadge}>
-          <Text style={styles.oneRmLabel}>1RM</Text>
-          <Text style={styles.oneRmValue}>{oneRM} kg</Text>
+          <Text style={styles.oneRmLabel}>{t('calculator.title_short', '1RM')}</Text>
+          <Text style={styles.oneRmValue}>{oneRM} {t('calculator.unit_kg')}</Text>
         </View>
       )}
 
@@ -78,7 +93,7 @@ export function ActiveExerciseCard({
         <View style={styles.inputCard}>
           <View style={styles.inputHeader}>
             <Text style={styles.inputIcon}>🏋️</Text>
-            <Text style={styles.inputLabel}>PAINO</Text>
+            <Text style={styles.inputLabel}>{t('session.exercise_card.weight').toUpperCase()}</Text>
           </View>
           <View style={styles.inputValueRow}>
             <Pressable 
@@ -89,7 +104,7 @@ export function ActiveExerciseCard({
             </Pressable>
             <View style={styles.inputValueContainer}>
               <Text style={styles.inputValue}>{result.weight}</Text>
-              <Text style={styles.inputUnit}>kg</Text>
+              <Text style={styles.inputUnit}>{t('calculator.unit_kg')}</Text>
             </View>
             <Pressable 
               style={styles.adjustButton}
@@ -103,7 +118,7 @@ export function ActiveExerciseCard({
               <Pressable
                 key={inc}
                 style={styles.quickButton}
-                onPress={() => adjustWeight(inc)}
+                onPress={() => handleWeightPreset(inc)}
               >
                 <Text style={styles.quickButtonText}>+{inc}</Text>
               </Pressable>
@@ -115,7 +130,7 @@ export function ActiveExerciseCard({
         <View style={styles.inputCard}>
           <View style={styles.inputHeader}>
             <Text style={styles.inputIcon}>⇆</Text>
-            <Text style={styles.inputLabel}>TOISTOT</Text>
+            <Text style={styles.inputLabel}>{t('session.exercise_card.reps').toUpperCase()}</Text>
           </View>
           <View style={styles.inputValueRow}>
             <Pressable 
@@ -126,7 +141,7 @@ export function ActiveExerciseCard({
             </Pressable>
             <View style={styles.inputValueContainer}>
               <Text style={styles.inputValue}>{result.reps}</Text>
-              <Text style={styles.inputUnit}>kpl</Text>
+              <Text style={styles.inputUnit}>{t('session.exercise_card.unit_pcs')}</Text>
             </View>
             <Pressable 
               style={styles.adjustButton}
@@ -143,7 +158,7 @@ export function ActiveExerciseCard({
                   styles.quickButton,
                   result.reps === rep && styles.quickButtonActive,
                 ]}
-                onPress={() => onRepsChange(rep)}
+                onPress={() => handleRepPreset(rep)}
               >
                 <Text style={[
                   styles.quickButtonText,

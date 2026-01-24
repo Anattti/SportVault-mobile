@@ -1,12 +1,13 @@
 import React, { useCallback, memo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   Pressable,
   ActivityIndicator,
   RefreshControl,
+  InteractionManager,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Clock, Dumbbell, ChevronRight } from "lucide-react-native";
@@ -23,14 +24,17 @@ import {
   getWorkoutEmoji,
   getCompletionColor,
 } from "@/hooks/useWorkoutHistory";
+import { DashboardHeader } from "@/components/layout/DashboardHeader";
 
 // ----- Session Card Component -----
 interface SessionCardProps {
   session: WorkoutSession;
   onPress: () => void;
+  t: (key: string) => string;
+  locale: string;
 }
 
-const SessionCard = memo(function SessionCard({ session, onPress }: SessionCardProps) {
+const SessionCard = memo(function SessionCard({ session, onPress, t, locale }: SessionCardProps) {
   const completionColors = getCompletionColor(session.completionPercentage);
   const emoji = getWorkoutEmoji(session.workoutType);
 
@@ -44,20 +48,20 @@ const SessionCard = memo(function SessionCard({ session, onPress }: SessionCardP
               <Text style={styles.emojiIcon}>{emoji}</Text>
             </View>
             <Text style={styles.dateText}>
-              {session.date ? formatDateShort(session.date) : "-"}
+              {session.date ? formatDateShort(session.date, locale) : "-"}
             </Text>
           </View>
 
           {/* Center Column - Info */}
           <View style={styles.centerCol}>
             <Text style={styles.workoutName} numberOfLines={1}>
-              {session.workoutName || session.notes || "Treeni"}
+              {session.workoutName || session.notes || t('history.default_session_name')}
             </Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Clock size={14} color={Colors.text.secondary} />
                 <Text style={styles.statText}>
-                  {formatDuration(session.duration || 0)}
+                  {formatDuration(session.duration || 0, t)}
                 </Text>
               </View>
               <View style={styles.statItem}>
@@ -94,29 +98,55 @@ const SessionCard = memo(function SessionCard({ session, onPress }: SessionCardP
 
 // ----- Empty State Component -----
 function EmptyState() {
+  const { t } = useTranslation();
   return (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>Ei aiempia treenejä.</Text>
+      <Text style={styles.emptyText}>{t('history.empty_sessions')}</Text>
     </View>
   );
 }
 
+import { Skeleton } from "@/components/ui/Skeleton";
+
 // ----- Loading State Component -----
 function LoadingState() {
-  return <ActivityIndicator color={Colors.neon.DEFAULT} style={styles.loadingIndicator} />;
+  return (
+    <View style={styles.loadingContainer}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Card key={i} style={styles.sessionCard} glass={false}>
+          <View style={styles.cardContent}>
+            <View style={styles.leftCol}>
+              <Skeleton width={40} height={40} variant="rounded" style={{ marginBottom: 4 }} />
+              <Skeleton width={30} height={12} variant="rounded" />
+            </View>
+            <View style={styles.centerCol}>
+              <Skeleton width="80%" height={20} variant="rounded" style={{ marginBottom: 8 }} />
+              <View style={styles.statsRow}>
+                <Skeleton width={60} height={14} variant="rounded" />
+                <Skeleton width={60} height={14} variant="rounded" />
+              </View>
+            </View>
+            <View style={styles.rightCol}>
+              <Skeleton width={64} height={32} variant="rounded" />
+            </View>
+          </View>
+        </Card>
+      ))}
+    </View>
+  );
 }
+
+import { FlashList } from "@shopify/flash-list";
+
+// ... (other imports)
 
 // ----- Main History Screen -----
 export default function HistoryScreen() {
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { sessions, isLoading, isRefetching, refresh } = useWorkoutHistory();
 
   // Refresh data when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh])
-  );
 
   const handleSessionPress = useCallback(
     (sessionId: string) => {
@@ -127,9 +157,14 @@ export default function HistoryScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: WorkoutSession }) => (
-      <SessionCard session={item} onPress={() => handleSessionPress(item.id)} />
+      <SessionCard 
+        session={item} 
+        onPress={() => handleSessionPress(item.id)}
+        t={t}
+        locale={i18n.language}
+      />
     ),
-    [handleSessionPress]
+    [handleSessionPress, t, i18n.language]
   );
 
   const keyExtractor = useCallback((item: WorkoutSession) => item.id, []);
@@ -141,28 +176,32 @@ export default function HistoryScreen() {
     return <EmptyState />;
   }, [isLoading]);
 
+  const renderSeparator = useCallback(() => <View style={{ height: 12 }} />, []);
+
   return (
     <View style={styles.container}>
-      <FlatList
-        data={sessions}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refresh}
-            tintColor={Colors.neon.DEFAULT}
-          />
-        }
-        ListEmptyComponent={renderEmptyComponent}
-        // Performance optimizations
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={10}
-        initialNumToRender={10}
-      />
+      <DashboardHeader />
+      <View style={{ flex: 1, paddingHorizontal: Spacing.horizontal }}>
+        <FlashList
+          data={sessions}
+          renderItem={renderItem}
+          ItemSeparatorComponent={renderSeparator}
+          keyExtractor={keyExtractor}
+          // @ts-ignore
+          estimatedItemSize={120} // Estimated height of SessionCard
+          drawDistance={2400}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refresh}
+              tintColor={Colors.neon.DEFAULT}
+            />
+          }
+          ListEmptyComponent={renderEmptyComponent}
+          contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}
+        />
+      </View>
     </View>
   );
 }
@@ -180,7 +219,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   sessionCard: {
-    backgroundColor: "#111111",
+    backgroundColor: Colors.card.background,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.05)",
@@ -263,7 +302,7 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     fontSize: 16,
   },
-  loadingIndicator: {
-    marginTop: 40,
+  loadingContainer: {
+    gap: 12,
   },
 });

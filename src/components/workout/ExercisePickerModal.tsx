@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ export function ExercisePickerModal({
   onSelect,
   excludeExerciseIds = [],
 }: ExercisePickerProps) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -114,10 +116,10 @@ export function ExercisePickerModal({
   }, [exercises, searchQuery, excludeExerciseIds]);
 
   // Quick-add templates
-  const quickAddExercises: WorkoutExercise[] = [
+  const quickAddExercises: WorkoutExercise[] = useMemo(() => [
     {
       id: 'quick-1',
-      name: 'Käsipainopunnerrus',
+      name: t('session.exercise_picker.quick_chest'),
       category: 'Rinta',
       supersetGroup: null,
       sets: [
@@ -128,7 +130,7 @@ export function ExercisePickerModal({
     },
     {
       id: 'quick-2',
-      name: 'Veto ylätaljasta',
+      name: t('session.exercise_picker.quick_back'),
       category: 'Selkä',
       supersetGroup: null,
       sets: [
@@ -139,7 +141,7 @@ export function ExercisePickerModal({
     },
     {
       id: 'quick-3',
-      name: 'Hauiskääntö',
+      name: t('session.exercise_picker.quick_arms'),
       category: 'Käsivarret',
       supersetGroup: null,
       sets: [
@@ -147,7 +149,7 @@ export function ExercisePickerModal({
         { id: 'q3s2', weight: 12, reps: 10, restTime: 60, isBodyweight: false, rpe: null, targetType: null },
       ],
     },
-  ];
+  ], [t]);
 
   const handleSelect = (exercise: WorkoutExercise) => {
     onSelect(exercise);
@@ -165,7 +167,7 @@ export function ExercisePickerModal({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Lisää liike</Text>
+          <Text style={styles.title}>{t('session.exercise_picker.title')}</Text>
           <Pressable style={styles.closeButton} onPress={onClose}>
             <X size={24} color={Colors.text.primary} />
           </Pressable>
@@ -176,7 +178,7 @@ export function ExercisePickerModal({
           <Search size={20} color={Colors.text.secondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Etsi liikettä..."
+            placeholder={t('session.exercise_picker.search_placeholder')}
             placeholderTextColor={Colors.text.secondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -192,7 +194,7 @@ export function ExercisePickerModal({
             {/* Quick Add */}
             {!searchQuery && (
               <>
-                <Text style={styles.sectionTitle}>Pikaluonti</Text>
+                <Text style={styles.sectionTitle}>{t('session.exercise_picker.quick_add')}</Text>
                 {quickAddExercises
                   .filter(ex => !excludeExerciseIds.includes(ex.id))
                   .map(exercise => (
@@ -207,7 +209,7 @@ export function ExercisePickerModal({
                       <View style={styles.exerciseInfo}>
                         <Text style={styles.exerciseName}>{exercise.name}</Text>
                         <Text style={styles.exerciseCategory}>
-                          {exercise.category} • {exercise.sets.length} sarjaa
+                          {exercise.category} • {t('session.exercise_picker.sets_count', { count: exercise.sets.length })}
                         </Text>
                       </View>
                       <View style={styles.addButton}>
@@ -217,7 +219,7 @@ export function ExercisePickerModal({
                   ))}
                 
                 <Text style={[styles.sectionTitle, { marginTop: 24 }]}>
-                  Aiemmat liikkeet
+                  {t('session.exercise_picker.previous_exercises')}
                 </Text>
               </>
             )}
@@ -235,7 +237,7 @@ export function ExercisePickerModal({
                 <View style={styles.exerciseInfo}>
                   <Text style={styles.exerciseName}>{exercise.name}</Text>
                   <Text style={styles.exerciseCategory}>
-                    {exercise.category || 'Ei kategoriaa'} • {exercise.sets.length} sarjaa
+                    {(exercise.category || t('session.exercise_picker.no_category'))} • {t('session.exercise_picker.sets_count', { count: exercise.sets.length })}
                   </Text>
                 </View>
                 <View style={styles.addButton}>
@@ -246,7 +248,7 @@ export function ExercisePickerModal({
 
             {filteredExercises.length === 0 && !isLoading && (
               <Text style={styles.noResults}>
-                Ei löytynyt liikkeitä hakusanalla "{searchQuery}"
+                {t('session.exercise_picker.no_results', { query: searchQuery })}
               </Text>
             )}
 

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   StyleSheet,
@@ -16,8 +17,10 @@ import {
   ScheduleModal,
 } from '@/components/calendar';
 import { CalendarDay } from '@/types/calendar';
+import { DashboardHeader } from '@/components/layout/DashboardHeader';
 
 export default function CalendarScreen() {
+  const { t } = useTranslation();
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -80,6 +83,7 @@ export default function CalendarScreen() {
 
   return (
     <View style={styles.container}>
+      <DashboardHeader />
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -104,11 +108,11 @@ export default function CalendarScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{scheduledCount}</Text>
-            <Text style={styles.statLabel}>Suunniteltu</Text>
+            <Text style={styles.statLabel}>{t('calendar.scheduled')}</Text>
           </View>
           <View style={[styles.statItem, styles.statItemBorder]}>
             <Text style={[styles.statValue, styles.completedValue]}>{completedCount}</Text>
-            <Text style={styles.statLabel}>Suoritettu</Text>
+            <Text style={styles.statLabel}>{t('calendar.completed')}</Text>
           </View>
         </View>
 
@@ -119,7 +123,7 @@ export default function CalendarScreen() {
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Virhe ladattaessa kalenteria</Text>
+            <Text style={styles.errorText}>{t('calendar.error_loading')}</Text>
           </View>
         ) : (
           <MonthView
@@ -132,11 +136,11 @@ export default function CalendarScreen() {
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, styles.scheduledDot]} />
-            <Text style={styles.legendText}>Suunniteltu</Text>
+            <Text style={styles.legendText}>{t('calendar.scheduled')}</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, styles.completedDot]} />
-            <Text style={styles.legendText}>Suoritettu</Text>
+            <Text style={styles.legendText}>{t('calendar.completed')}</Text>
           </View>
         </View>
       </ScrollView>

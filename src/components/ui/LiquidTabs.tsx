@@ -121,13 +121,10 @@ export function LiquidTabs({ tabs, activeTabId, onTabChange }: LiquidTabsProps) 
 
 // Subcomponent for Icon to handle color animation easily
 function TabIcon({ icon: Icon, isActive }: { icon: LucideIcon; isActive: boolean }) {
-  // We can just switch colors or animate them. 
-  // For simplicity and "pop", direct switch with the parent spring works well.
-  // But let's try a subtle color transition if we wanted.
   return (
     <Icon 
-      size={isActive ? 18 : 22} 
-      color={isActive ? "#000000" : "#666666"} 
+      size={isActive ? 22 : 26} 
+      color={isActive ? "#000000" : "#888888"} 
     />
   );
 }
@@ -136,19 +133,20 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1A1A1A",
+    backgroundColor: Colors.card.background,
     borderRadius: 100,
     padding: 6,
-    position: 'relative', // Context for absolute indicator
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.05)",
   },
   indicator: {
     position: 'absolute',
     top: 6,
     bottom: 6,
-    left: 0, // animated via translateX
+    left: 0,
     backgroundColor: Colors.neon.DEFAULT,
     borderRadius: 100,
-    // Add subtle shadow/glow for "liquid glass" feel
     shadowColor: Colors.neon.DEFAULT,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
@@ -156,14 +154,14 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   tabItem: {
-    zIndex: 1, // Above indicator
+    zIndex: 1,
   },
   tabContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
     gap: 8,
   },
   label: {
@@ -172,3 +170,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+
+

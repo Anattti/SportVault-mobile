@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, ScrollView, Pressable, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing } from '@/constants/Layout';
@@ -7,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dumbbell, Hash, Calculator } from 'lucide-react-native';
+import { DashboardHeader } from '@/components/layout/DashboardHeader';
 
 const percentages = [
     { reps: 1, percentage: 100 },
@@ -25,6 +27,7 @@ const percentages = [
 type Formula = 'brzycki' | 'epley' | 'lander';
 
 export default function CalculatorScreen() {
+    const { t } = useTranslation();
     const [weight, setWeight] = useState<string>('');
     const [reps, setReps] = useState<string>('');
     const [formula, setFormula] = useState<Formula>('brzycki');
@@ -69,21 +72,22 @@ export default function CalculatorScreen() {
 
     return (
         <View style={styles.container}>
+            <DashboardHeader />
             <ScrollView 
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>1RM Laskuri</Text>
-                    <Text style={styles.headerSubtitle}>Arvioi maksimituloksesi</Text>
+                    <Text style={styles.headerTitle}>{t('calculator.title')}</Text>
+                    <Text style={styles.headerSubtitle}>{t('calculator.subtitle')}</Text>
                 </View>
 
                 <Card glass style={styles.mainCard}>
                     <CardHeader>
                         <View style={styles.resultContainer}>
-                            <Text style={styles.resultLabel}>Arvioitu 1RM</Text>
+                            <Text style={styles.resultLabel}>{t('calculator.estimated_1rm')}</Text>
                             <Text style={styles.resultValue}>
-                                {result > 0 ? `${result} kg` : '-'}
+                                {result > 0 ? `${result} ${t('calculator.unit_kg')}` : '-'}
                             </Text>
                         </View>
                     </CardHeader>
@@ -92,7 +96,7 @@ export default function CalculatorScreen() {
                         <View style={styles.row}>
                             <View style={styles.flex1}>
                                 <Input
-                                    label="Paino (kg)"
+                                    label={t('calculator.weight_label')}
                                     value={weight}
                                     onChangeText={setWeight}
                                     keyboardType="numeric"
@@ -102,7 +106,7 @@ export default function CalculatorScreen() {
                             </View>
                             <View style={styles.flex1}>
                                 <Input
-                                    label="Toistot"
+                                    label={t('calculator.reps_label')}
                                     value={reps}
                                     onChangeText={setReps}
                                     keyboardType="numeric"
@@ -113,7 +117,7 @@ export default function CalculatorScreen() {
                         </View>
 
                         <View style={styles.formulaSection}>
-                            <Text style={styles.inputLabel}>Laskukaava</Text>
+                            <Text style={styles.inputLabel}>{t('calculator.formula_label')}</Text>
                             <View style={styles.formulaGroup}>
                                 {renderFormulaButton('brzycki', 'Brzycki')}
                                 {renderFormulaButton('epley', 'Epley')}
@@ -126,13 +130,13 @@ export default function CalculatorScreen() {
                 {result > 0 && (
                      <Card glass style={styles.tableCard}>
                         <CardHeader>
-                             <CardTitle style={{ fontSize: 18 }}>Sarjapainot</CardTitle>
+                             <CardTitle style={{ fontSize: 18 }}>{t('calculator.table_title')}</CardTitle>
                         </CardHeader>
                         <View style={styles.tableBlock}>
                             <View style={styles.tableHeader}>
-                                <Text style={[styles.tableHeadText, { flex: 1 }]}>%</Text>
-                                <Text style={[styles.tableHeadText, { flex: 2 }]}>Paino</Text>
-                                <Text style={[styles.tableHeadText, { flex: 1, textAlign: 'right' }]}>Toistot</Text>
+                                <Text style={[styles.tableHeadText, { flex: 1 }]}>{t('calculator.percentage_col')}</Text>
+                                <Text style={[styles.tableHeadText, { flex: 2 }]}>{t('calculator.weight_col')}</Text>
+                                <Text style={[styles.tableHeadText, { flex: 1, textAlign: 'right' }]}>{t('calculator.reps_col')}</Text>
                             </View>
                             {percentages.map((item, index) => (
                                 <View key={item.reps} style={[
@@ -143,7 +147,7 @@ export default function CalculatorScreen() {
                                         {item.percentage}%
                                     </Text>
                                     <Text style={[styles.tableCell, { flex: 2, color: Colors.neon.DEFAULT, fontWeight: '700' }]}>
-                                        {((result * item.percentage) / 100).toFixed(1)} kg
+                                        {((result * item.percentage) / 100).toFixed(1)} {t('calculator.unit_kg')}
                                     </Text>
                                     <Text style={[styles.tableCell, { flex: 1, textAlign: 'right' }]}>
                                         {item.reps}

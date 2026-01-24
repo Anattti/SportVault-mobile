@@ -1,0 +1,421 @@
+{
+  "common": {
+    "welcome": "Tervetuloa",
+    "save": "Tallenna",
+    "cancel": "Peruuta",
+    "edit": "Muokkaa",
+    "delete": "Poista",
+    "back": "Takaisin",
+    "next": "Seuraava",
+    "add_workout": "Lisää treeni"
+  },
+  "nav": {
+    "workouts": "Treenit",
+    "history": "Historia",
+    "analytics": "Analytiikka",
+    "calendar": "Kalenteri",
+    "calculator": "1RM"
+  },
+  "workouts": {
+    "title": "Treenipohjat",
+    "unnamed_exercise": "Nimetön liike",
+    "empty_templates": "Ei treenipohjia vielä.",
+    "create_first": "Luo ensimmäinen treeni",
+    "avg_duration": "Kesto",
+    "not_available": "N/A",
+    "hours": " h",
+    "minutes": " min",
+    "hours_full": " tuntia",
+    "minutes_full": " minuuttia",
+    "edit_workout": "Muokkaa treeniä",
+    "create_workout": "Luo uusi treeni",
+    "workout_name": "Treenin nimi",
+    "workout_name_placeholder": "Esim. Jalkatreeni",
+    "type": "Tyyppi",
+    "select_type": "Valitse tyyppi",
+    "exercises": "Liikkeet",
+    "exercise_name": "Liikkeen nimi",
+    "exercise_name_placeholder": "Esim. Penkkipunnerrus",
+    "category": "Kategoria",
+    "select_category": "Valitse kategoria",
+    "set": "Sarja",
+    "bodyweight": "Kehon paino",
+    "reps": "Toistot",
+    "meters": "Metrit",
+    "seconds": "Sekunnit",
+    "weight_kg": "Paino (kg)",
+    "sets": "Sarjat",
+    "rest_s": "Palautus (s)",
+    "add_set": "LISÄÄ SARJA",
+    "add_exercise": "LISÄÄ UUSI LIIKE",
+    "notes_label": "MUISTIINPANOT",
+    "notes_placeholder": "Kirjoita muistiinpanoja treenistä...",
+    "save_workout": "TALLENNA TREENI",
+    "types": {
+      "endurance_basic": "Peruskestävyys (PK)",
+      "endurance_max": "Maksimikestävyys",
+      "strength": "Voimaharjoittelu",
+      "speed_explosive": "Nopeus- ja räjähtävyysharjoittelu",
+      "mobility": "Liikkuvuus- ja kehonhuolto"
+    },
+    "categories": {
+      "legs": "Jalat",
+      "arms": "Kädet",
+      "core": "Keskivartalo",
+      "back": "Selkä",
+      "chest": "Rinta",
+      "shoulders": "Olkapäät"
+    },
+    "errors": {
+      "missing_name": "Anna treenille nimi.",
+      "missing_type": "Valitse treenin tyyppi.",
+      "missing_exercise": "Lisää vähintään yksi liike.",
+      "fetch_failed": "Treenin tietojen haku epäonnistui.",
+      "save_failed": "Treenin tallennus epäonnistui."
+    },
+    "details": {
+      "program_tag": "TREENIOHJELMA",
+      "preview_tag": "ESIKATSELU",
+      "avg_duration": "KESKIM. KESTO",
+      "one_rm": "1RM",
+      "exercises_label": "LIIKKEET",
+      "sets_label": "SARJAT",
+      "sets_unit": "yht.",
+      "count_unit": "kpl",
+      "set_num": "SARJA",
+      "start_workout": "ALOITA TREENI",
+      "close_preview": "VALMIS",
+      "share": "JAA",
+      "edit": "MUOKKAA",
+      "delete": "POISTA",
+      "deleting": "POISTETAAN...",
+      "delete_title": "Poista treeniohjelma",
+      "delete_confirm": "Haluatko varmasti poistaa treeniohjelman \"{{name}}\"? Tätä toimintoa ei voi perua.",
+      "delete_success": "Treeniohjelma poistettu.",
+      "delete_error": "Treeniohjelman poistaminen epäonnistui. Yritä uudelleen.",
+      "share_message": "Tsekkaa mun treeniohjelma: {{name}}"
+    }
+  },
+  "calculator": {
+    "title": "1RM Laskuri",
+    "subtitle": "Arvioi maksimituloksesi",
+    "estimated_1rm": "Arvioitu 1RM",
+    "weight_label": "Paino (kg)",
+    "reps_label": "Toistot",
+    "formula_label": "Laskukaava",
+    "table_title": "Sarjapainot",
+    "percentage_col": "%",
+    "weight_col": "Paino",
+    "reps_col": "Toistot",
+    "unit_kg": "kg"
+  },
+  "history": {
+    "title": "Historia",
+    "empty_sessions": "Ei aiempia treenejä.",
+    "default_session_name": "Treeni"
+  },
+  "dashboard": {
+    "title": "Koti",
+    "stats": "Tilastot",
+    "calendar": "Kalenteri",
+    "workouts": "Treenit"
+  },
+  "calendar": {
+    "title": "Kalenteri",
+    "scheduled": "Suunniteltu",
+    "completed": "Suoritettu",
+    "error_loading": "Virhe ladattaessa kalenteria",
+    "months": {
+      "0": "Tammikuu",
+      "1": "Helmikuu",
+      "2": "Maaliskuu",
+      "3": "Huhtikuu",
+      "4": "Toukokuu",
+      "5": "Kesäkuu",
+      "6": "Heinäkuu",
+      "7": "Elokuu",
+      "8": "Syyskuu",
+      "9": "Lokakuu",
+      "10": "Marraskuu",
+      "11": "Joulukuu"
+    },
+    "weekdays": {
+      "0": "su",
+      "1": "ma",
+      "2": "ti",
+      "3": "ke",
+      "4": "to",
+      "5": "pe",
+      "6": "la"
+    },
+    "modal": {
+      "scheduled_title": "Suunnitellut treenit",
+      "add_title": "Lisää treeni",
+      "no_templates": "Ei treeniohjelmia. Luo ensin treeniohjelma.",
+      "notes_placeholder": "Lisää muistiinpanoja (valinnainen)",
+      "schedule_button": "Aikatauluta treeni",
+      "completed_badge": "{{count}} treeniä suoritettu",
+      "status": {
+        "completed": "Suoritettu",
+        "skipped": "Ohitettu",
+        "scheduled": "Suunniteltu"
+      },
+      "delete_title": "Poista suunniteltu treeni",
+      "delete_confirm": "Haluatko varmasti poistaa tämän treenin kalenterista?",
+      "errors": {
+        "schedule_failed": "Treenin aikataulutus epäonnistui",
+        "delete_failed": "Poisto epäonnistui",
+        "update_failed": "Tilan päivitys epäonnistui"
+      }
+    }
+  },
+  "profile": {
+    "title": "Profiili",
+    "nickname": "Nimimerkki",
+    "age": "Ikä",
+    "height": "Pituus (cm)",
+    "weight": "Paino (kg)",
+    "experience_level": "Kokemustaso",
+    "goals": "Tavoitteet",
+    "goals_placeholder": "Kirjoita tavoitteesi tähän...",
+    "not_set": "Ei asetettu",
+    "save_changes": "Tallenna muutokset",
+    "saving": "Tallennetaan...",
+    "logout": "Kirjaudu ulos",
+    "logout_confirm": "Haluatko varmasti kirjautua ulos?",
+    "update_success": "Profiili päivitetty!",
+    "update_error": "Profiilin päivitys epäonnistui",
+    "success": "Onnistui",
+    "error": "Virhe"
+  },
+  "analytics": {
+    "title": "Analytiikka",
+    "workouts_analyzed": "treeniä analysoitu",
+    "volume_increased": "Volyymi kasvanut",
+    "volume_spike_desc": "Viikon volyymi on {{percent}}% korkeampi kuin keskiarvo. Huolehdi palautumisesta.",
+    "weekly_volume": "Viikkovolyymi",
+    "not_enough_data": "Ei tarpeeksi dataa",
+    "not_enough_workout_data": "Ei tarpeeksi treenidataa",
+    "one_rm_progression": "1RM Kehitys",
+    "current": "Nykyinen",
+    "pr": "PR",
+    "plateau_warnings": "Tasannevaroitukset",
+    "weeks_without_progress": "{{weeks}} viikkoa ilman kehitystä",
+    "suggestions": {
+      "deload": "Kokeile periodisointia tai deload-viikkoa. {{name}} on ollut paikallaan {{weeks}} viikkoa.",
+      "intensity": "Vaihda rep range tai lisää intensiivisyyttä (RPE). Kokeile esim. pause-toistoja.",
+      "accessory": "Lisää 1-2 apuliikettä {{name}}-liikkeelle tai tarkista palautumisesi."
+    },
+    "overtraining": {
+      "volume_spike": "Volyymi on kasvanut yli 30% kahtena peräkkäisenä viikkona. Harkitse deload-viikkoa.",
+      "high_frequency": "Treenifrekvenssi on korkea (>6 treeniä/viikko). Varmista riittävä palautuminen."
+    },
+    "stable": "Tasainen",
+    "ton": "ton"
+  },
+  "stats": {
+    "title": "Tilastot",
+    "overview": "Yleisnäkymä",
+    "weekly_workouts": "Treenejä tällä viikolla",
+    "weekly_duration": "Treeniaika tällä viikolla",
+    "weekly_volume": "Kokonaiskuorma tällä viikolla",
+    "progression": "Progressio",
+    "vs_last_week": "vs. viime viikko",
+    "goals": "Tavoitteet",
+    "new_goal": "Uusi tavoite",
+    "no_active_goals": "Ei aktiivisia tavoitteita"
+  },
+  "session": {
+    "header": {
+      "stop": "Lopeta"
+    },
+    "controls": {
+      "mark_complete": "Merkitse suoritetuksi",
+      "next_set": "Seuraava sarja",
+      "next_exercise": "Seuraava liike",
+      "finish_workout": "Lopeta treeni"
+    },
+    "warmup": {
+      "warmup_title": "Alkulämmittely",
+      "cooldown_title": "Loppujäähdyttely",
+      "method": "Tapa",
+      "intensity": "Teho",
+      "notes": "Muistiinpanot",
+      "notes_placeholder": "Kirjoita fiilikset...",
+      "skip": "Ohita",
+      "done": "Valmis",
+      "duration_label": "Kesto",
+      "methods": {
+        "juoksumatto": "Juoksumatto",
+        "cross_trainer": "Cross-trainer",
+        "kuntopyora": "Kuntopyörä",
+        "soutulaite": "Soutulaite",
+        "hyppynaru": "Hyppynaru",
+        "muu": "Muu"
+      },
+      "intensities": {
+        "kevyt": "Kevyt",
+        "keskitaso": "Keskitaso",
+        "raskas": "Raskas"
+      }
+    },
+    "alerts": {
+      "finish_title": "Lopeta treeni",
+      "finish_message": "Haluatko lopettaa treenin?",
+      "cancel": "Peruuta",
+      "save_and_finish": "Tallenna ja lopeta",
+      "discard": "Hylkää",
+      "offline_saved_title": "Tallennettu paikallisesti",
+      "offline_saved_message": "Treeni tallennetaan Supabaseen kun verkkoyhteys palautuu.",
+      "save_error": "Treenin tallennus epäonnistui. Tarkista verkkoyhteys.",
+      "load_error": "Treenin lataus epäonnistui"
+    },
+    "exercise_card": {
+      "set_num": "Sarja {{num}}",
+      "weight": "Paino",
+      "reps": "Toistot",
+      "add_note": "Lisää muistiinpano",
+      "estimated_1rm": "Arvioitu 1RM",
+      "unit_pcs": "kpl"
+    },
+    "rest_timer": {
+      "title": "Palautumisaika",
+      "rest": "Lepo",
+      "done": "Valmis"
+    },
+    "exercise_reorder": {
+      "title": "Muokkaa liikkeiden järjestystä",
+      "completed": "Valmis",
+      "save": "Tallenna järjestys"
+    },
+    "rpe": {
+      "title": "RPE",
+      "very_light": "Erittäin kevyt 😌",
+      "light_exertion": "Kevyt rasitus 🤏",
+      "moderate": "Kohtalainen 🤨",
+      "hard": "Raskas 💪",
+      "very_hard": "Hyvin raskas 🔥",
+      "max": "Maksimi 💥",
+      "label_light": "Kevyt",
+      "label_hard": "Raskas"
+    },
+    "notes": {
+      "set_comment": "Sarjan kommentti",
+      "set_comment_placeholder": "Kirjoita kommentti tähän sarjalle...",
+      "exercise_notes": "Muistiinpanot",
+      "exercise_notes_placeholder": "Kirjoita muistiinpanot tähän..."
+    },
+    "progress": {
+      "missed_goal": "Tavoitteesta jääty:",
+      "set_weight_fail": "Sarja {{num}}: Paino {{diff}}kg",
+      "set_reps_fail": "Sarja {{num}}: Toistot {{diff}}"
+    },
+    "banner": {
+      "active_workout": "Treeni käynnissä",
+      "resume": "Jatka"
+    },
+    "exercise_picker": {
+      "title": "Lisää liike",
+      "search_placeholder": "Etsi liikettä...",
+      "quick_add": "Pikaluonti",
+      "previous_exercises": "Aiemmat liikkeet",
+      "no_category": "Ei kategoriaa",
+      "no_results": "Ei löytynyt liikkeitä hakusanalla \"{{query}}\"",
+      "sets_count": "{{count}} sarjaa",
+      "quick_chest": "Rintatreeni",
+      "quick_back": "Selkätreeni",
+      "quick_arms": "Kätitreeni"
+    },
+    "warmup_cooldown": {
+      "types": {
+        "cardio": "Kardio",
+        "dynamic_stretch": "Dynaaminen",
+        "static_stretch": "Staattinen",
+        "mobility": "Liikkuvuus"
+      },
+      "presets": {
+        "treadmill": "Juoksumatto",
+        "bike": "Kuntopyörä",
+        "rower": "Soutulaite",
+        "arm_circles": "Käsien pyöritykset",
+        "leg_swings": "Jalkojen heilautukset",
+        "hip_circles": "Lantion pyöritykset",
+        "jumping_jacks": "Haarahypyt",
+        "high_knees": "Polvennostojuoksu",
+        "butt_kicks": "Pakara-juoksu",
+        "torso_rotations": "Torson kierrot",
+        "walk": "Kävely",
+        "hamstring_stretch": "Reiden takaosa venytys",
+        "quad_stretch": "Reiden etuosa venytys",
+        "glute_stretch": "Pakara venytys",
+        "hip_flexor_stretch": "Lonkankoukistaja venytys",
+        "shoulder_stretch": "Olkapää venytys",
+        "chest_stretch": "Rintalihas venytys",
+        "back_stretch": "Selkä venytys",
+        "foam_rolling": "Foam rolling",
+        "breathing": "Hengitysharjoitus"
+      }
+    },
+    "cooldown": {
+      "title": "Jäähdyttely",
+      "total": "Yhteensä:",
+      "movements_count": "{{count}} liikettä",
+      "select_movements": "Valitse liikkeet",
+      "skip": "Ohita",
+      "start": "Aloita jäähdyttely"
+    }
+  },
+  "auth": {
+    "login": "Kirjaudu",
+    "register": "Rekisteröidy",
+    "email": "Sähköposti",
+    "password": "Salasana",
+    "username": "Käyttäjänimi",
+    "confirm_password": "Vahvista salasana",
+    "login_button": "Kirjaudu sisään",
+    "register_button": "Luo tili",
+    "forgot_password": "Unohditko salasanan?",
+    "subtitle": "Hallitse treenejäsi ammattimaisesti",
+    "errors": {
+      "email_required": "Sähköposti on pakollinen",
+      "invalid_email": "Virheellinen sähköposti",
+      "username_required": "Käyttäjänimi on pakollinen",
+      "username_min": "Käyttäjänimen on oltava vähintään 3 merkkiä",
+      "username_invalid": "Vain kirjaimia, numeroita ja alaviivoja",
+      "password_required": "Salasana on pakollinen",
+      "password_min": "Salasanan on oltava vähintään 6 merkkiä",
+      "passwords_dont_match": "Salasanat eivät täsmää",
+      "confirm_password_required": "Vahvista salasana"
+    },
+    "alerts": {
+      "register_success": "Rekisteröityminen onnistui",
+      "check_email": "Tarkista sähköpostisi vahvistuslinkkiä varten."
+    }
+  },
+  "offline": {
+    "no_connection": "Ei verkkoyhteyttä",
+    "pending_sync": "{{count}} synkronoimatonta treeniä",
+    "syncing": "Synkronoidaan...",
+    "sync_button": "Synkronoi"
+  },
+  "session_summary": {
+    "title": "Treenin yhteenveto",
+    "editing": "MUOKKAUS",
+    "edit": "Muokkaa",
+    "duration": "KESTO",
+    "volume": "VOLYYMI",
+    "add_note": "Lisää muistiinpano",
+    "save_success_title": "Tallennettu",
+    "save_success_msg": "Muutokset tallennettu onnistuneesti (Huom: Muutokset eivät välttämättä päivity vanhaan web-näkymään).",
+    "save_error": "Muutosten tallennus epäonnistui.",
+    "delete_title": "Poista treeni",
+    "delete_confirm": "Oletko varma, että haluat poistaa tämän treenin? Tätä toimintoa ei voi peruuttaa.",
+    "delete_error": "Treenin poisto epäonnistui.",
+    "cancel": "Peruuta",
+    "save_changes": "Tallenna muutokset",
+    "notes": "Muistiinpanot",
+    "notes_placeholder": "Kirjoita muistiinpano...",
+    "exercise_notes_label": "Liikkeen muistiinpanot",
+    "exercise_notes_placeholder": "Kirjoita muistiinpano liikkeelle..."
+  }
+}

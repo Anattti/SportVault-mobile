@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -10,14 +11,14 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { X, CheckCircle, Trash2, Dumbbell, Calendar, Check, ChevronRight, Clock } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { X, CheckCircle, Trash2, Dumbbell, Calendar, Check } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/Colors';
 import { CalendarDay, ScheduledWorkout } from '@/types/calendar';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useScheduleWorkout, useDeleteScheduledWorkout, useUpdateScheduledWorkout } from '@/hooks/useScheduledWorkouts';
-import { getWorkoutEmoji, formatDuration } from '@/hooks/useWorkoutHistory';
+import { getWorkoutEmoji } from '@/hooks/useWorkoutHistory';
 
 interface ScheduleModalProps {
   visible: boolean;
@@ -32,8 +33,8 @@ interface WorkoutOption {
 }
 
 export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalProps) {
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  const router = useRouter();
   const [workouts, setWorkouts] = useState<WorkoutOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
@@ -63,8 +64,6 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
 
       if (error) throw error;
       
-      // Data is transformed in render via useMemo if needed, but for now we just set state
-      // Ideally we would simplify state management or just map here once
       setWorkouts(
         (data || []).map((w) => ({
           id: w.id,
@@ -91,24 +90,24 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
       
       handleClose();
     } catch (error) {
-      Alert.alert('Virhe', 'Treenin aikataulutus epäonnistui');
+      Alert.alert(t('profile.error'), t('calendar.modal.errors.schedule_failed'));
     }
   };
 
   const handleDeleteScheduled = async (scheduledId: string) => {
     Alert.alert(
-      'Poista suunniteltu treeni',
-      'Haluatko varmasti poistaa tämän treenin kalenterista?',
+      t('calendar.modal.delete_title'),
+      t('calendar.modal.delete_confirm'),
       [
-        { text: 'Peruuta', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Poista',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await deleteScheduled.mutateAsync(scheduledId);
             } catch (error) {
-              Alert.alert('Virhe', 'Poisto epäonnistui');
+              Alert.alert(t('profile.error'), t('calendar.modal.errors.delete_failed'));
             }
           },
         },
@@ -123,7 +122,7 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
         updates: { status: 'completed' },
       });
     } catch (error) {
-      Alert.alert('Virhe', 'Tilan päivitys epäonnistui');
+      Alert.alert(t('profile.error'), t('calendar.modal.errors.update_failed'));
     }
   };
 
@@ -134,8 +133,9 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
   };
 
   if (!selectedDay) return null;
-
-  const formattedDate = selectedDay.date.toLocaleDateString('fi-FI', {
+  
+  const locale = i18n.language === 'fi' ? 'fi-FI' : 'en-US';
+  const formattedDate = selectedDay.date.toLocaleDateString(locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -148,7 +148,7 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
       animationType="slide"
       onRequestClose={handleClose}
     >
-      <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+      <BlurView intensity={20} style={styles.overlay} tint="dark">
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
@@ -162,7 +162,7 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
             {/* Scheduled workouts for this day */}
             {selectedDay.scheduledWorkouts.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Suunnitellut treenit</Text>
+                <Text style={styles.sectionTitle}>{t('calendar.modal.scheduled_title')}</Text>
                 {selectedDay.scheduledWorkouts.map((scheduled) => (
                   <View key={scheduled.id} style={styles.scheduledCard}>
                     <View style={styles.scheduledInfo}>
@@ -171,11 +171,11 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
                       </Text>
                       <View style={styles.scheduledTextContainer}>
                         <Text style={styles.scheduledName}>
-                          {scheduled.workout?.program || 'Treeni'}
+                          {scheduled.workout?.program || t('history.default_session_name')}
                         </Text>
                         <Text style={styles.scheduledStatus}>
-                          {scheduled.status === 'completed' ? '✅ Suoritettu' : 
-                           scheduled.status === 'skipped' ? '⏭️ Ohitettu' : '📅 Suunniteltu'}
+                          {scheduled.status === 'completed' ? `✅ ${t('calendar.modal.status.completed')}` : 
+                           scheduled.status === 'skipped' ? `⏭️ ${t('calendar.modal.status.skipped')}` : `📅 ${t('calendar.modal.status.scheduled')}`}
                         </Text>
                       </View>
                     </View>
@@ -200,53 +200,25 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
               </View>
             )}
 
-            {/* Completed sessions */}
-            {selectedDay.completedSessions.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Suoritetut treenit</Text>
-                {selectedDay.completedSessions.map((session) => (
-                  <TouchableOpacity
-                    key={session.id}
-                    style={styles.completedSessionCard}
-                    onPress={() => {
-                      handleClose();
-                      router.push(`/workouts/session/${session.id}`);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.completedSessionInfo}>
-                      <Text style={styles.completedSessionEmoji}>
-                        {getWorkoutEmoji(session.workoutType)}
-                      </Text>
-                      <View style={styles.completedSessionTextContainer}>
-                        <Text style={styles.completedSessionName}>
-                          {session.workoutName || 'Treeni'}
-                        </Text>
-                        {!!session.duration && (
-                          <View style={styles.completedSessionMeta}>
-                            <Clock size={12} color={Colors.text.muted} />
-                            <Text style={styles.completedSessionDuration}>
-                              {formatDuration(session.duration)}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <ChevronRight size={20} color={Colors.text.muted} />
-                  </TouchableOpacity>
-                ))}
+            {/* Completed sessions (Badge style) */}
+            {selectedDay.completedSessionsCount > 0 && (
+              <View style={styles.completedBadge}>
+                <Dumbbell size={16} color={Colors.neon.DEFAULT} />
+                <Text style={styles.completedText}>
+                  {t('calendar.modal.completed_badge', { count: selectedDay.completedSessionsCount })}
+                </Text>
               </View>
             )}
 
             {/* Add new scheduled workout */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Lisää treeni</Text>
+              <Text style={styles.sectionTitle}>{t('calendar.modal.add_title')}</Text>
               
               {isLoading ? (
                 <ActivityIndicator color={Colors.neon.DEFAULT} style={{ marginVertical: 20 }} />
               ) : workouts.length === 0 ? (
                 <Text style={styles.emptyText}>
-                  Ei treeniohjelmia. Luo ensin treeniohjelma.
+                  {t('calendar.modal.no_templates')}
                 </Text>
               ) : (
                 <View style={styles.workoutGrid}>
@@ -279,7 +251,7 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
               {selectedWorkout && (
                 <TextInput
                   style={styles.notesInput}
-                  placeholder="Lisää muistiinpanoja (valinnainen)"
+                  placeholder={t('calendar.modal.notes_placeholder')}
                   placeholderTextColor={Colors.text.muted}
                   value={notes}
                   onChangeText={setNotes}
@@ -301,13 +273,13 @@ export function ScheduleModal({ visible, onClose, selectedDay }: ScheduleModalPr
               ) : (
                 <>
                   <Calendar size={20} color={Colors.background} />
-                  <Text style={styles.scheduleButtonText}>Aikatauluta treeni</Text>
+                  <Text style={styles.scheduleButtonText}>{t('calendar.modal.schedule_button')}</Text>
                 </>
               )}
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </BlurView>
     </Modal>
   );
 }
@@ -419,45 +391,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Colors.neon.DEFAULT,
-  },
-  // Completed session card styles
-  completedSessionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.calendar.completedFaint,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 159, 10, 0.2)',
-  },
-  completedSessionInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  completedSessionEmoji: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  completedSessionTextContainer: {
-    flex: 1,
-  },
-  completedSessionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text.primary,
-  },
-  completedSessionMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  completedSessionDuration: {
-    fontSize: 12,
-    color: Colors.text.muted,
   },
   emptyText: {
     color: Colors.text.muted,

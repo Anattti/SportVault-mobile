@@ -106,7 +106,7 @@ export type Database = {
           is_completed: boolean
           target_value: number
           title: string
-          type: string
+          type: "exercise_weight" | "weekly_workouts" | "monthly_volume" | "custom"
           unit: string
           user_id: string
         }
@@ -119,7 +119,7 @@ export type Database = {
           is_completed?: boolean
           target_value: number
           title: string
-          type: string
+          type: "exercise_weight" | "weekly_workouts" | "monthly_volume" | "custom"
           unit: string
           user_id: string
         }
@@ -132,11 +132,19 @@ export type Database = {
           is_completed?: boolean
           target_value?: number
           title?: string
-          type?: string
+          type?: "exercise_weight" | "weekly_workouts" | "monthly_volume" | "custom"
           unit?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "goals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       session_exercises: {
         Row: {
@@ -190,10 +198,10 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           id: string
-          notes: string | null
           reps_completed: number | null
           rest_time_taken: number | null
           rpe: number | null
+          notes?: string | null
           session_exercise_id: string | null
           sets_completed: number | null
           weight_used: number | null
@@ -204,10 +212,10 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           id?: string
-          notes?: string | null
           reps_completed?: number | null
           rest_time_taken?: number | null
           rpe?: number | null
+          notes?: string | null
           session_exercise_id?: string | null
           sets_completed?: number | null
           weight_used?: number | null
@@ -218,10 +226,10 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           id?: string
-          notes?: string | null
           reps_completed?: number | null
           rest_time_taken?: number | null
           rpe?: number | null
+          notes?: string | null
           session_exercise_id?: string | null
           sets_completed?: number | null
           weight_used?: number | null
@@ -244,13 +252,6 @@ export type Database = {
           share_token: string
           workout_id: string
         }
-        Insert: {
-          created_at?: string
-          created_by: string
-          id?: string
-          share_token: string
-          workout_id: string
-        }
         Update: {
           created_at?: string
           created_by?: string
@@ -261,6 +262,67 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "shared_workouts_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shared_workouts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheduled_workouts: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          reminder_minutes: number | null
+          scheduled_date: string
+          scheduled_time: string | null
+          status: "pending" | "completed" | "skipped" | null
+          updated_at: string | null
+          user_id: string
+          workout_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reminder_minutes?: number | null
+          scheduled_date: string
+          scheduled_time?: string | null
+          status?: "pending" | "completed" | "skipped" | null
+          updated_at?: string | null
+          user_id: string
+          workout_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reminder_minutes?: number | null
+          scheduled_date?: string
+          scheduled_time?: string | null
+          status?: "pending" | "completed" | "skipped" | null
+          updated_at?: string | null
+          user_id?: string
+          workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_workouts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_workouts_workout_id_fkey"
             columns: ["workout_id"]
             isOneToOne: false
             referencedRelation: "workouts"
@@ -302,7 +364,15 @@ export type Database = {
           updated_at?: string | null
           weight?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workout_results: {
         Row: {
@@ -362,6 +432,8 @@ export type Database = {
           total_volume: number | null
           user_id: string | null
           workout_id: string | null
+          warmup: Json | null
+          cooldown: Json | null
         }
         Insert: {
           _offline?: boolean | null
@@ -497,7 +569,15 @@ export type Database = {
           user_id?: string
           workout_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workouts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -505,6 +585,10 @@ export type Database = {
     }
     Functions: {
       get_shared_workout: { Args: { p_share_token: string }; Returns: Json }
+      delete_workout_session: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       insert_workout_with_children: {
         Args: {
           p_date: string
@@ -522,6 +606,12 @@ export type Database = {
           workout_created_at: string
           workout_id: string
         }[]
+      }
+      save_full_workout_session: {
+        Args: {
+          payload: Json
+        }
+        Returns: Json
       }
       upsert_workout_with_children: {
         Args: {

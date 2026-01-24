@@ -5,6 +5,7 @@ import { View, StyleSheet } from "react-native";
 import { Colors } from "@/constants/Colors";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { useEffect } from "react";
+import "@/lib/i18n"; // Initialize i18n
 
 function RootLayoutNav() {
   const { session, loading } = useAuth();
@@ -54,14 +55,6 @@ function RootLayoutNav() {
       <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
       <Stack.Screen name="(dashboard)" options={{ headerShown: false }} />
       <Stack.Screen 
-        name="workout-flow/active" 
-        options={{ 
-          headerShown: false,
-          presentation: "fullScreenModal",
-          animation: "slide_from_bottom"
-        }} 
-      />
-      <Stack.Screen 
         name="workout-session/[id]" 
         options={{ 
           headerShown: false,
@@ -73,7 +66,10 @@ function RootLayoutNav() {
   );
 }
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActiveSessionProvider } from '@/context/ActiveSessionContext';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { startSyncMonitor } from '@/lib/offlineSync';
@@ -81,12 +77,20 @@ import { startSyncMonitor } from '@/lib/offlineSync';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 2, // 2 minutes default - reduces unnecessary refetches
-      retry: 2, // Limit retries on failure
-      refetchOnWindowFocus: false, // Not needed in React Native
-      refetchOnReconnect: true, // Refetch when network reconnects
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+      retry: 2,
+      networkMode: 'offlineFirst', // Allow queries to run without network
+    },
+    mutations: {
+      networkMode: 'offlineFirst', // Allow mutations to run without network
     },
   },
+});
+
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  throttleTime: 3000, // Throttle saves to once every 3 seconds
 });
 
 export default function Layout() {
@@ -97,7 +101,10 @@ export default function Layout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider 
+      client={queryClient} 
+      persistOptions={{ persister: asyncStoragePersister }}
+    >
       <AuthProvider>
         <ActiveSessionProvider>
           <SafeAreaProvider>
@@ -109,7 +116,7 @@ export default function Layout() {
           </SafeAreaProvider>
         </ActiveSessionProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
 

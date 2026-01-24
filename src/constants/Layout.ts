@@ -3,5 +3,5 @@
  */
 export const Spacing = {
   /** Horizontal padding for dashboard screens */
-  horizontal: 5,
+  horizontal: 15,
 };

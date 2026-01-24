@@ -22,11 +22,22 @@ export interface WorkoutSession {
   completionPercentage: number;
 }
 
+export type SessionExercise = Database["public"]["Tables"]["session_exercises"]["Row"] & {
+  sets: Database["public"]["Tables"]["session_sets"]["Row"][];
+};
+
+export type FullWorkoutSession = {
+  session: WorkoutSessionRow & { workouts: { program: string } | null };
+  exercises: SessionExercise[];
+};
+
 // Query key factory for consistent cache management
 export const workoutHistoryKeys = {
   all: ["workout_history"] as const,
   list: (userId: string | undefined) => [...workoutHistoryKeys.all, userId] as const,
+  range: (userId: string | undefined, start: string, end: string) => [...workoutHistoryKeys.all, "range", userId, start, end] as const,
   detail: (sessionId: string) => [...workoutHistoryKeys.all, "detail", sessionId] as const,
+  avgDuration: (workoutId: string) => [...workoutHistoryKeys.all, "avg_duration", workoutId] as const,
 };
 
 // Data fetching function
@@ -105,6 +116,101 @@ export function useWorkoutHistory() {
   };
 }
 
+/**
+ * Hook to fetch a single session with exercises and sets
+ */
+export function useWorkoutSessionDetail(sessionId: string) {
+  return useQuery({
+    queryKey: workoutHistoryKeys.detail(sessionId),
+    queryFn: async (): Promise<FullWorkoutSession | null> => {
+      // 1. Fetch from workout_sessions
+      const { data: sessionData, error: sessionError } = await supabase
+        .from("workout_sessions")
+        .select(`*, workouts (program)`)
+        .eq("id", sessionId)
+        .maybeSingle();
+
+      if (sessionError) throw sessionError;
+      if (!sessionData) return null;
+
+      // 2. Fetch exercises
+      const { data: exercisesData, error: exercisesError } = await supabase
+        .from("session_exercises")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("order_index", { ascending: true });
+
+      if (exercisesError) throw exercisesError;
+
+      // 3. Fetch sets
+      let exercises: SessionExercise[] = [];
+      if (exercisesData && exercisesData.length > 0) {
+        const exerciseIds = exercisesData.map(ex => ex.id);
+        const { data: setsData, error: setsError } = await supabase
+          .from("session_sets")
+          .select("*")
+          .in("session_exercise_id", exerciseIds)
+          .order("created_at", { ascending: true });
+
+        if (setsError) throw setsError;
+
+        exercises = exercisesData.map(ex => ({
+          ...ex,
+          sets: setsData?.filter(s => s.session_exercise_id === ex.id) || []
+        }));
+      }
+
+      return { session: sessionData as any, exercises };
+    },
+    enabled: !!sessionId,
+  });
+}
+
+/**
+ * Hook to fetch sessions within a specific date range (for stats)
+ */
+export function useWorkoutStats(startDate: string, endDate: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: workoutHistoryKeys.range(user?.id, startDate, endDate),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workout_sessions")
+        .select("*")
+        .eq("user_id", user!.id)
+        .gte("date", startDate)
+        .lt("date", endDate);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id && !!startDate && !!endDate,
+  });
+}
+
+/**
+ * Hook to calculate average duration for a specific workout template
+ */
+export function useWorkoutAvgDuration(workoutId: string, baseDuration: number) {
+  return useQuery({
+    queryKey: workoutHistoryKeys.avgDuration(workoutId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workout_sessions")
+        .select("duration")
+        .eq("workout_id", workoutId)
+        .not('duration', 'is', null);
+
+      if (error || !data || data.length === 0) return baseDuration;
+      
+      const total = data.reduce((sum, s) => sum + (s.duration || 0), 0);
+      return Math.round(total / data.length);
+    },
+    enabled: !!workoutId,
+  });
+}
+
 // Utility functions
 export function formatVolume(kg: number): string {
   if (kg >= 1000) {
@@ -113,14 +219,21 @@ export function formatVolume(kg: number): string {
   return `${kg} kg`;
 }
 
-export function formatDuration(totalSeconds: number): string {
+export function formatDuration(totalSeconds: number, t?: (key: string) => string): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
-  return h > 0 ? `${h}h ${m}min` : `${m}min`;
+  
+  const hUnit = t ? t('workouts.hours') : 'h';
+  const mUnit = t ? t('workouts.minutes') : 'min';
+
+  return h > 0 ? `${h}${hUnit} ${m}${mUnit}` : `${m}${mUnit}`;
 }
 
-export function formatDateShort(dateString: string): string {
+export function formatDateShort(dateString: string, locale: string = 'fi-FI'): string {
   const date = new Date(dateString);
+  if (locale === 'en-US' || locale.startsWith('en')) {
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+  }
   return `${date.getDate()}.${date.getMonth() + 1}.`;
 }
 

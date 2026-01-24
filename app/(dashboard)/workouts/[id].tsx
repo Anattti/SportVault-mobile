@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { 
   View, 
   Text, 
@@ -39,8 +40,11 @@ interface ExerciseWithSets extends Exercise {
   exercise_sets: ExerciseSet[];
 }
 
+import { useWorkoutAvgDuration } from "@/hooks/useWorkoutHistory";
+
 export default function WorkoutDetailsScreen() {
-  const { id } = useLocalSearchParams();
+  const { t } = useTranslation();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -66,46 +70,36 @@ export default function WorkoutDetailsScreen() {
           exercise_sets (*)
         `)
         .eq("workout_id", id)
-        .order("created_at", { ascending: true });
+        .order("order_index", { ascending: true });
 
       if (exerciseError) throw exerciseError;
-
-      // 3. Fetch average duration
-      let avg = workoutData.duration || 0;
-      const { data: sessionData, error: sessionError } = await supabase
-        .from("workout_sessions")
-        .select("duration")
-        .eq("workout_id", id)
-        .not('duration', 'is', null);
-
-      if (!sessionError && sessionData && sessionData.length > 0) {
-        const total = sessionData.reduce((sum, s) => sum + (s.duration || 0), 0);
-        avg = Math.round(total / sessionData.length);
-      }
 
       return {
         workout: workoutData,
         exercises: exerciseData as ExerciseWithSets[],
-        avgDuration: avg
       };
     },
     enabled: !!id,
   });
 
+  const { data: avgDuration = details?.workout.duration || 0 } = useWorkoutAvgDuration(
+    id as string, 
+    details?.workout.duration || 0
+  );
+
   const workout = details?.workout;
   const exercises = details?.exercises || [];
-  const avgDuration = details?.avgDuration || 0;
 
   const formatDuration = (totalSeconds: number) => {
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
-    return `${h} h ${m} m`;
+    return `${h}${t('workouts.hours')} ${m}${t('workouts.minutes')}`;
   };
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Tsekkaa mun treeniohjelma: ${workout?.program}`,
+        message: t('workouts.details.share_message', { name: workout?.program }),
       });
     } catch (error) {
       console.error(error);
@@ -114,15 +108,15 @@ export default function WorkoutDetailsScreen() {
 
   const handleDelete = () => {
     Alert.alert(
-      "Poista treeniohjelma",
-      `Haluatko varmasti poistaa treeniohjelman "${workout?.program}"? Tätä toimintoa ei voi perua.`,
+      t('workouts.details.delete_title'),
+      t('workouts.details.delete_confirm', { name: workout?.program }),
       [
         {
-          text: "Peruuta",
+          text: t('profile.cancel'),
           style: "cancel",
         },
         {
-          text: "Poista",
+          text: t('workouts.details.delete'),
           style: "destructive",
           onPress: async () => {
             try {
@@ -144,8 +138,8 @@ export default function WorkoutDetailsScreen() {
             } catch (error) {
               console.error("Virhe poistettaessa treeniä:", error);
               Alert.alert(
-                "Virhe",
-                "Treeniohjelman poistaminen epäonnistui. Yritä uudelleen."
+                t('profile.error'),
+                t('workouts.details.delete_error')
               );
             } finally {
               setIsDeleting(false);
@@ -173,7 +167,7 @@ export default function WorkoutDetailsScreen() {
         <View style={styles.headerContent}>
           <View style={styles.tagRow}>
             <View style={styles.tagDot} />
-            <Text style={styles.tagText}>TREENIOHJELMA</Text>
+            <Text style={styles.tagText}>{t('workouts.details.preview_tag')}</Text>
           </View>
           <Text style={styles.title} numberOfLines={2}>{workout?.program}</Text>
         </View>
@@ -185,7 +179,7 @@ export default function WorkoutDetailsScreen() {
       {/* Stats Row */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Text style={styles.statLabel}>KESKIM. KESTO</Text>
+          <Text style={styles.statLabel}>{t('workouts.details.avg_duration')}</Text>
           <View style={styles.statValueRow}>
             <Clock color={Colors.neon.DEFAULT} size={16} />
             <Text style={styles.statValue}>{formatDuration(avgDuration)}</Text>
@@ -193,18 +187,18 @@ export default function WorkoutDetailsScreen() {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statLabel}>LIIKKEET</Text>
+          <Text style={styles.statLabel}>{t('workouts.details.exercises_label')}</Text>
           <View style={styles.statValueRow}>
             <Dumbbell color={Colors.neon.DEFAULT} size={16} />
-            <Text style={styles.statValue}>{exercises.length} kpl</Text>
+            <Text style={styles.statValue}>{exercises.length} {t('workouts.details.count_unit')}</Text>
           </View>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statLabel}>SARJAT</Text>
+          <Text style={styles.statLabel}>{t('workouts.details.sets_label')}</Text>
           <View style={styles.statValueRow}>
             <Trophy color={Colors.neon.DEFAULT} size={16} />
-            <Text style={styles.statValue}>{totalSets} yht.</Text>
+            <Text style={styles.statValue}>{totalSets} {t('workouts.details.sets_unit')}</Text>
           </View>
         </View>
       </View>
@@ -222,7 +216,7 @@ export default function WorkoutDetailsScreen() {
                 <Text style={styles.exerciseName}>{ex.name}</Text>
               </View>
               <View style={styles.oneRMBadge}>
-                <Text style={styles.oneRMText}>1RM <Text style={styles.oneRMValue}>128 kg</Text></Text>
+                <Text style={styles.oneRMText}>{t('workouts.details.one_rm')} <Text style={styles.oneRMValue}>128 {t('calculator.unit_kg')}</Text></Text>
               </View>
             </View>
 
@@ -233,12 +227,12 @@ export default function WorkoutDetailsScreen() {
             >
               {ex.exercise_sets.map((set: ExerciseSet, setIndex: number) => (
                 <View key={set.id} style={styles.setCard}>
-                  <Text style={styles.setLabel}>SET {setIndex + 1}</Text>
+                  <Text style={styles.setLabel}>{t('workouts.details.set_num')} {setIndex + 1}</Text>
                   <View style={styles.setDataRow}>
                     <Text style={styles.setMainValue}>{set.reps}</Text>
                     <Text style={styles.setX}>×</Text>
                     <Text style={styles.setMainValue}>{set.weight}</Text>
-                    <Text style={styles.setUnit}>kg</Text>
+                    <Text style={styles.setUnit}>{t('calculator.unit_kg')}</Text>
                   </View>
                 </View>
               ))}
@@ -256,14 +250,14 @@ export default function WorkoutDetailsScreen() {
         >
           <View style={styles.startButtonContent}>
             <Play color="#000" size={20} fill="#000" />
-            <Text style={styles.startButtonText}>ALOITA TREENI</Text>
+            <Text style={styles.startButtonText}>{t('workouts.details.start_workout')}</Text>
           </View>
         </Button>
 
         <View style={styles.footerButtons}>
           <Pressable style={styles.footerBtn} onPress={handleShare}>
             <Share2 color={Colors.text.secondary} size={18} />
-            <Text style={styles.footerBtnText}>JAA</Text>
+            <Text style={styles.footerBtnText}>{t('workouts.details.share')}</Text>
           </Pressable>
           <View style={styles.footerDivider} />
           <Pressable 
@@ -271,7 +265,7 @@ export default function WorkoutDetailsScreen() {
             onPress={() => router.push({ pathname: "/(dashboard)/workouts/create", params: { id } })}
           >
             <Edit3 color={Colors.text.secondary} size={18} />
-            <Text style={styles.footerBtnText}>MUOKKAA</Text>
+            <Text style={styles.footerBtnText}>{t('workouts.details.edit')}</Text>
           </Pressable>
           <View style={styles.footerDivider} />
           <Pressable 
@@ -285,7 +279,7 @@ export default function WorkoutDetailsScreen() {
               <Trash2 color="#ff4444" size={18} />
             )}
             <Text style={[styles.footerBtnText, { color: isDeleting ? Colors.text.muted : '#ff4444' }]}>
-              {isDeleting ? 'POISTETAAN...' : 'POISTA'}
+              {isDeleting ? t('workouts.details.deleting') : t('workouts.details.delete')}
             </Text>
           </Pressable>
         </View>

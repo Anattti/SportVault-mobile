@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TextInput, ScrollView, Pressable, ActivityIndicator, Alert } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { Colors } from "@/constants/Colors";
@@ -19,6 +20,7 @@ type ProfileData = {
 };
 
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user, signOut } = useAuth();
   const insets = useSafeAreaInsets();
@@ -84,10 +86,10 @@ export default function ProfileScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user_profile'] });
       setIsEditing(false);
-      Alert.alert("Onnistui", "Profiili päivitetty!");
+      Alert.alert(t('profile.success'), t('profile.update_success'));
     },
     onError: (error) => {
-      Alert.alert("Virhe", "Profiilin päivitys epäonnistui: " + error.message);
+      Alert.alert(t('profile.error'), `${t('profile.update_error')}: ${error.message}`);
     },
   });
 
@@ -97,12 +99,12 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      "Kirjaudu ulos",
-      "Haluatko varmasti kirjautua ulos?",
+      t('profile.logout'),
+      t('profile.logout_confirm'),
       [
-        { text: "Peruuta", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         { 
-          text: "Kirjaudu ulos", 
+          text: t('profile.logout'), 
           style: "destructive",
           onPress: async () => {
             await signOut();
@@ -126,7 +128,7 @@ export default function ProfileScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft color={Colors.text.primary} size={24} />
         </Pressable>
-        <Text style={styles.title}>Profiili</Text>
+        <Text style={styles.title}>{t('profile.title')}</Text>
         <Pressable 
           onPress={() => isEditing ? handleSave() : setIsEditing(true)} 
           style={styles.actionButton}
@@ -135,9 +137,9 @@ export default function ProfileScreen() {
           {updateProfileMutation.isPending ? (
             <ActivityIndicator size="small" color={Colors.neon.DEFAULT} />
           ) : isEditing ? (
-            <Text style={styles.saveText}>Tallenna</Text>
+            <Text style={styles.saveText}>{t('common.save')}</Text>
           ) : (
-             <Text style={styles.editText}>Muokkaa</Text>
+             <Text style={styles.editText}>{t('common.edit')}</Text>
           )}
         </Pressable>
       </View>
@@ -152,14 +154,14 @@ export default function ProfileScreen() {
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nimimerkki</Text>
+            <Text style={styles.label}>{t('profile.nickname')}</Text>
             <View style={styles.inputContainer}>
               <User size={20} color={Colors.text.secondary} />
               <TextInput
                 style={[styles.input, !isEditing && styles.disabledInput]}
                 value={formData.nickname}
                 onChangeText={(text) => setFormData({...formData, nickname: text})}
-                placeholder="Ei asetettu"
+                placeholder={t('profile.not_set')}
                 placeholderTextColor={Colors.text.secondary}
                 editable={isEditing}
               />
@@ -168,7 +170,7 @@ export default function ProfileScreen() {
 
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Ikä</Text>
+              <Text style={styles.label}>{t('profile.age')}</Text>
               <View style={styles.inputContainer}>
                 <Calendar size={20} color={Colors.text.secondary} />
                 <TextInput
@@ -184,7 +186,7 @@ export default function ProfileScreen() {
             </View>
             <View style={{ width: 16 }} />
              <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Kokemustaso</Text>
+              <Text style={styles.label}>{t('profile.experience_level')}</Text>
               <View style={styles.inputContainer}>
                 <Award size={20} color={Colors.text.secondary} />
                 <TextInput
@@ -201,7 +203,7 @@ export default function ProfileScreen() {
 
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Pituus (cm)</Text>
+              <Text style={styles.label}>{t('profile.height')}</Text>
               <View style={styles.inputContainer}>
                 <Ruler size={20} color={Colors.text.secondary} />
                 <TextInput
@@ -219,7 +221,7 @@ export default function ProfileScreen() {
             <View style={{ width: 16 }} />
 
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Paino (kg)</Text>
+              <Text style={styles.label}>{t('profile.weight')}</Text>
               <View style={styles.inputContainer}>
                  <Weight size={20} color={Colors.text.secondary} />
                 <TextInput
@@ -236,14 +238,14 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Tavoitteet</Text>
+            <Text style={styles.label}>{t('profile.goals')}</Text>
             <View style={[styles.inputContainer, styles.textAreaContainer]}>
                <Target size={20} color={Colors.text.secondary} style={{ marginTop: 12 }} />
               <TextInput
                 style={[styles.input, styles.textArea, !isEditing && styles.disabledInput]}
                 value={formData.fitness_goals}
                 onChangeText={(text) => setFormData({...formData, fitness_goals: text})}
-                placeholder="Kirjoita tavoitteesi tähän..."
+                placeholder={t('profile.goals_placeholder')}
                 placeholderTextColor={Colors.text.secondary}
                 multiline
                 numberOfLines={4}
@@ -259,14 +261,14 @@ export default function ProfileScreen() {
                 disabled={updateProfileMutation.isPending}
             >
                 <Text style={styles.saveButtonText}>
-                    {updateProfileMutation.isPending ? "Tallennetaan..." : "Tallenna muutokset"}
+                    {updateProfileMutation.isPending ? t('profile.saving') : t('profile.save_changes')}
                 </Text>
             </Button>
           )}
 
           <Pressable style={styles.logoutButton} onPress={handleLogout}>
             <LogOut size={20} color={Colors.status.destructive} />
-            <Text style={styles.logoutText}>Kirjaudu ulos</Text>
+            <Text style={styles.logoutText}>{t('profile.logout')}</Text>
           </Pressable>
 
         </View>

@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, Pressable, ViewStyle } from "react-native";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/lib/supabase";
 import { Colors } from "@/constants/Colors";
 import { Spacing } from "@/constants/Layout";
@@ -19,6 +20,7 @@ import DraggableFlatList, {
 } from "react-native-draggable-flatlist";
 
 import * as Haptics from "expo-haptics";
+import { DashboardHeader } from "@/components/layout/DashboardHeader";
 
 
 type Workout = Database["public"]["Tables"]["workouts"]["Row"] & {
@@ -27,6 +29,7 @@ type Workout = Database["public"]["Tables"]["workouts"]["Row"] & {
 };
 
 export default function WorkoutsScreen() {
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -79,14 +82,15 @@ export default function WorkoutsScreen() {
   };
 
   const formatDuration = (totalSeconds: number | undefined) => {
-    if (totalSeconds === undefined || totalSeconds === null) return "N/A";
+    if (totalSeconds === undefined || totalSeconds === null) return t('workouts.not_available');
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
-    return `${h} h ${m} m`;
+    return `${h}${t('workouts.hours')} ${m}${t('workouts.minutes')}`;
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("fi-FI");
+    const locale = i18n.language === 'fi' ? 'fi-FI' : 'en-US';
+    return new Date(dateString).toLocaleDateString(locale);
   };
 
   // Handle drag end - update display_order in Supabase
@@ -160,6 +164,7 @@ export default function WorkoutsScreen() {
 
   return (
     <View style={styles.container}>
+      <DashboardHeader />
       <DraggableFlatList
         data={workouts}
         renderItem={renderItem}
@@ -175,26 +180,18 @@ export default function WorkoutsScreen() {
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Ei treenipohjia vielä.</Text>
+              <Text style={styles.emptyText}>{t('workouts.empty_templates')}</Text>
               <Button 
                 variant="outline" 
                 style={styles.emptyButton}
                 onPress={() => router.push("/(dashboard)/workouts/create")}
               >
-                <Text style={styles.emptyButtonText}>Luo ensimmäinen treeni</Text>
+                <Text style={styles.emptyButtonText}>{t('workouts.create_first')}</Text>
               </Button>
             </View>
           ) : null
         }
       />
-      
-      {/* FAB - Create Workout */}
-      <Pressable 
-        style={styles.fab}
-        onPress={() => router.push("/(dashboard)/workouts/create")}
-      >
-        <Plus color="#000" size={32} />
-      </Pressable>
     </View>
   );
 }
@@ -216,7 +213,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   workoutCard: {
-    backgroundColor: "#111111",
+    backgroundColor: Colors.card.background,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.05)",

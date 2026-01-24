@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DraggableFlatList, {
@@ -32,6 +33,7 @@ export function ExerciseReorderModal({
   onClose,
   onSave,
 }: ExerciseReorderModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const prevVisible = useRef(false);
   
@@ -103,7 +105,7 @@ export function ExerciseReorderModal({
         </Text>
         
         <View style={styles.completedTag}>
-          <Text style={styles.completedTagText}>Valmis</Text>
+          <Text style={styles.completedTagText}>{t('session.exercise_reorder.completed')}</Text>
         </View>
       </View>
     );
@@ -120,7 +122,7 @@ export function ExerciseReorderModal({
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-            <Text style={styles.title}>Muokkaa liikkeiden järjestystä</Text>
+            <Text style={styles.title}>{t('session.exercise_reorder.title')}</Text>
             <Pressable onPress={onClose} style={styles.closeButton}>
               <X color={Colors.text.primary} size={24} />
             </Pressable>
@@ -150,10 +152,10 @@ export function ExerciseReorderModal({
           {/* Footer */}
           <View style={styles.footer}>
             <Pressable style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Peruuta</Text>
+              <Text style={styles.cancelButtonText}>{t('session_summary.cancel')}</Text>
             </Pressable>
             <Pressable style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>Tallenna järjestys</Text>
+              <Text style={styles.saveButtonText}>{t('session.exercise_reorder.save')}</Text>
             </Pressable>
           </View>
         </View>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Play } from 'lucide-react-native';
@@ -6,6 +7,7 @@ import { Colors } from '@/constants/Colors';
 import { useActiveSession } from '@/context/ActiveSessionContext';
 
 export function ActiveSessionBanner() {
+  const { t } = useTranslation();
   const { activeSession, getElapsedTime, resumeSession } = useActiveSession();
   const router = useRouter();
   const [elapsedTime, setElapsedTime] = React.useState(0);
@@ -33,14 +35,14 @@ export function ActiveSessionBanner() {
     <Pressable style={styles.container} onPress={resumeSession}>
       <View style={styles.pulsingDot} />
       <View style={styles.content}>
-        <Text style={styles.title}>Treeni käynnissä</Text>
+        <Text style={styles.title}>{t('session.banner.active_workout')}</Text>
         <Text style={styles.subtitle}>
           {activeSession.workoutName} • {formatTime(elapsedTime)}
         </Text>
       </View>
       <View style={styles.resumeButton}>
         <Play size={16} color="#000" fill="#000" />
-        <Text style={styles.resumeText}>Jatka</Text>
+        <Text style={styles.resumeText}>{t('session.banner.resume')}</Text>
       </View>
     </Pressable>
   );

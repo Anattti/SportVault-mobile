@@ -1,6 +1,6 @@
 /**
  * Sync Engine
- * Background sync manager for processing offline queue
+ * Background sync manager for processing offline queue with batch support
  */
 
 import { supabase } from '@/lib/supabase';
@@ -12,6 +12,8 @@ import {
   acquireSyncLock,
   releaseSyncLock,
   SyncItem,
+  SyncItemType,
+  addToQueue
 } from './syncQueue';
 
 const MAX_RETRIES = 5;
@@ -40,152 +42,6 @@ function getRetryDelay(retryCount: number): number {
 }
 
 /**
- * Process a single sync item
- */
-async function processSyncItem(item: SyncItem): Promise<boolean> {
-  try {
-    const { type, operation, data, id } = item;
-
-    switch (type) {
-      case 'workout_session':
-        return await syncWorkoutSession(operation, data, id);
-      case 'session_exercise':
-        return await syncSessionExercise(operation, data, id);
-      case 'session_set':
-        return await syncSessionSet(operation, data, id);
-      default:
-        console.warn(`[SyncEngine] Unknown sync type: ${type}`);
-        return false;
-    }
-  } catch (error) {
-    console.error(`[SyncEngine] Error processing item ${item.id}:`, error);
-    return false;
-  }
-}
-
-/**
- * Sync workout session to Supabase
- */
-async function syncWorkoutSession(
-  operation: string,
-  data: Record<string, unknown>,
-  id: string
-): Promise<boolean> {
-  switch (operation) {
-    case 'insert': {
-      // Update offline flag to false before inserting
-      const insertData = { ...data, _offline: false, _pendingsync: false };
-      const { error } = await supabase
-        .from('workout_sessions')
-        .insert(insertData as never);
-      
-      if (error) {
-        console.error('[SyncEngine] Insert workout_session error:', error);
-        return false;
-      }
-      return true;
-    }
-    case 'update': {
-      const updateData = { ...data, _offline: false, _pendingsync: false };
-      const { error } = await supabase
-        .from('workout_sessions')
-        .update(updateData as never)
-        .eq('id', id);
-      
-      if (error) {
-        console.error('[SyncEngine] Update workout_session error:', error);
-        return false;
-      }
-      return true;
-    }
-    case 'delete': {
-      const { error } = await supabase
-        .from('workout_sessions')
-        .delete()
-        .eq('id', id);
-      
-      if (error) {
-        console.error('[SyncEngine] Delete workout_session error:', error);
-        return false;
-      }
-      return true;
-    }
-    default:
-      return false;
-  }
-}
-
-/**
- * Sync session exercise to Supabase
- */
-async function syncSessionExercise(
-  operation: string,
-  data: Record<string, unknown>,
-  id: string
-): Promise<boolean> {
-  switch (operation) {
-    case 'insert': {
-      const { error } = await supabase
-        .from('session_exercises')
-        .insert(data as never);
-      return !error;
-    }
-    case 'update': {
-      const { error } = await supabase
-        .from('session_exercises')
-        .update(data as never)
-        .eq('id', id);
-      return !error;
-    }
-    case 'delete': {
-      const { error } = await supabase
-        .from('session_exercises')
-        .delete()
-        .eq('id', id);
-      return !error;
-    }
-    default:
-      return false;
-  }
-}
-
-/**
- * Sync session set to Supabase
- */
-async function syncSessionSet(
-  operation: string,
-  data: Record<string, unknown>,
-  id: string
-): Promise<boolean> {
-  switch (operation) {
-    case 'insert': {
-      const insertData = { ...data, _offline: false, _pendingsync: false };
-      const { error } = await supabase
-        .from('session_sets')
-        .insert(insertData as never);
-      return !error;
-    }
-    case 'update': {
-      const updateData = { ...data, _offline: false, _pendingsync: false };
-      const { error } = await supabase
-        .from('session_sets')
-        .update(updateData as never)
-        .eq('id', id);
-      return !error;
-    }
-    case 'delete': {
-      const { error } = await supabase
-        .from('session_sets')
-        .delete()
-        .eq('id', id);
-      return !error;
-    }
-    default:
-      return false;
-  }
-}
-
-/**
  * Process the entire sync queue
  */
 export async function processQueue(): Promise<{ synced: number; failed: number }> {
@@ -204,39 +60,101 @@ export async function processQueue(): Promise<{ synced: number; failed: number }
   }
 
   try {
-    emit('sync_start');
     const queue = await getQueue();
     
     if (queue.length === 0) {
       console.log('[SyncEngine] Queue empty');
-      emit('sync_complete', { synced: 0, failed: 0 });
       return { synced: 0, failed: 0 };
     }
 
+    emit('sync_start');
     console.log(`[SyncEngine] Processing ${queue.length} items`);
     
     let synced = 0;
     let failed = 0;
 
-    // Sort by timestamp (oldest first) for proper ordering
+    // Group items by session to batch them
+    // Map<SessionID, SyncItem[]>
+    const sessionBatches = new Map<string, SyncItem[]>();
+    const otherItems: SyncItem[] = [];
+
+    // Sort by timestamp (oldest first)
     const sortedQueue = [...queue].sort((a, b) => a.timestamp - b.timestamp);
 
+    // 1. First pass: Identify sessions and grouping
     for (const item of sortedQueue) {
-      // Skip items that have exceeded max retries
-      if (item.retryCount >= MAX_RETRIES) {
-        console.warn(`[SyncEngine] Item ${item.id} exceeded max retries, skipping`);
-        failed++;
-        continue;
+      if (item.type === 'workout_session') {
+        const sessionId = item.id;
+        if (!sessionBatches.has(sessionId)) {
+          sessionBatches.set(sessionId, []);
+        }
+        sessionBatches.get(sessionId)?.push(item);
+      } else if (item.type === 'session_exercise') {
+        const sessionId = item.data.session_id as string;
+        if (sessionId) {
+           if (!sessionBatches.has(sessionId)) {
+             sessionBatches.set(sessionId, []);
+           }
+           sessionBatches.get(sessionId)?.push(item);
+        } else {
+          otherItems.push(item);
+        }
+      } else if (item.type === 'session_set') {
+         // Sets don't have session_id directly, usually only session_exercise_id
+         // For now, we put them in 'otherItems' unless we can link them.
+         // OPTIMIZATION: In a real app we'd map exercise->session to group these too.
+         // However, simple batching of checking workout_session existence is often enough for the main payload.
+         // Let's see if we can perform a basic link if we have the exercise in the queue.
+         const exerciseId = item.data.session_exercise_id as string;
+         // Find exercise in current queue to get session_id
+         const relatedExercise = sortedQueue.find(q => q.type === 'session_exercise' && q.id === exerciseId);
+         if (relatedExercise && relatedExercise.data.session_id) {
+           const sessionId = relatedExercise.data.session_id as string;
+           if (!sessionBatches.has(sessionId)) {
+             sessionBatches.set(sessionId, []);
+           }
+           sessionBatches.get(sessionId)?.push(item);
+         } else {
+           otherItems.push(item);
+         }
+      } else {
+        otherItems.push(item);
+      }
+    }
+
+    // 2. Process Batches (RPC)
+    for (const [sessionId, items] of sessionBatches) {
+      // Check max retries for the batch (use any item's retry count)
+      if (items.some(i => i.retryCount >= MAX_RETRIES)) {
+          console.warn(`[SyncEngine] Batch for session ${sessionId} exceeded max retries, skipping`);
+          failed += items.length;
+          continue;
       }
 
-      // Check network before each item
-      if (!(await isOnline())) {
-        console.log('[SyncEngine] Lost connection during sync');
-        break;
+      console.log(`[SyncEngine] Processing batch for session ${sessionId} (${items.length} items)`);
+      const success = await syncSessionBatch(sessionId, items);
+
+      if (success) {
+        // Remove all items in batch
+        for (const item of items) {
+          await removeFromQueue(item.id);
+          emit('item_synced', { id: item.id, type: item.type });
+        }
+        synced += items.length;
+      } else {
+        // Increment retry for all
+        for (const item of items) {
+           await incrementRetryCount(item.id, 'Batch sync failed');
+        }
+        failed += items.length;
       }
+    }
+
+    // 3. Process remaining items individually (legacy fallback)
+    for (const item of otherItems) {
+      if (item.retryCount >= MAX_RETRIES) continue;
 
       const success = await processSyncItem(item);
-
       if (success) {
         await removeFromQueue(item.id);
         synced++;
@@ -244,10 +162,6 @@ export async function processQueue(): Promise<{ synced: number; failed: number }
       } else {
         await incrementRetryCount(item.id, 'Sync failed');
         failed++;
-        
-        // Add delay before next attempt (exponential backoff)
-        const delay = getRetryDelay(item.retryCount);
-        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
@@ -260,24 +174,119 @@ export async function processQueue(): Promise<{ synced: number; failed: number }
 }
 
 /**
+ * Sync a batch of items for a single session using RPC
+ */
+async function syncSessionBatch(sessionId: string, items: SyncItem[]): Promise<boolean> {
+  // 1. Construct the payload
+  // Find the session data (latest update prefers)
+  const sessionItem = items.find(i => i.type === 'workout_session');
+  // If we have only children but no session parent in queue, we might need to fetch it or this is a partial update?
+  // Current RPC requires session object.
+  // If sessionItem is missing, we strictly can't use save_full_workout_session easily unless we fetch current state.
+  // Fallback: if no session item, return false so they fall through to individual processing? 
+  // OR: We construct a minimal session object if we are just adding sets? 
+  // Let's stick to: Use RPC only if we have the session item (e.g. creating/finishing workout).
+  
+  if (!sessionItem) {
+    // Cannot batch without the session parent context for the RPC in its current design
+    console.log('[SyncEngine] No session parent in batch, falling back to individual processing');
+    return false; // Will be processed by fallback logic? No, we removed them from 'otherItems'.
+    // Logic fix: We need to handle this. 
+    // Actually, 'otherItems' are populated only if NOT matching sessionBatches logic.
+    // If we are here, we put them in the batch.
+    // We should fallback to individual processing inside here or return false.
+    // If we return false, the outside loop increments retry. That's bad if it's just a Logic mismatch.
+    // Let's execute them individually here if RPC is not possible.
+    
+    let allSuccess = true;
+    for (const item of items) {
+      if (!(await processSyncItem(item))) allSuccess = false;
+    }
+    return allSuccess;
+  }
+
+  const exercises = items.filter(i => i.type === 'session_exercise').map(i => i.data);
+  const sets = items.filter(i => i.type === 'session_set').map(i => i.data);
+
+  const payload = {
+    session: sessionItem.data,
+    exercises: exercises,
+    sets: sets
+  };
+
+  // 2. Call RPC
+  const { data, error } = await supabase.rpc('save_full_workout_session', { payload });
+
+  if (error) {
+    console.error('[SyncEngine] RPC Batch save failed:', error);
+    return false;
+  }
+
+  // Check application level success from RPC response if it returns one
+  // Our RPC returns jsonb_build_object('success', true/false...)
+  if (data && data.success === false) {
+     console.error('[SyncEngine] RPC returned error:', data.error);
+     return false;
+  }
+
+  return true;
+}
+
+
+/**
+ * Process a single sync item (Legacy/Fallback)
+ */
+async function processSyncItem(item: SyncItem): Promise<boolean> {
+  try {
+    const { type, operation, data, id } = item;
+    // ... (Use existing simple sync functions)
+    switch (type) {
+      case 'workout_session': return await syncWorkoutSession(operation, data, id);
+      case 'session_exercise': return await syncSessionExercise(operation, data, id);
+      case 'session_set': return await syncSessionSet(operation, data, id);
+      default: return false;
+    }
+  } catch (error) {
+    console.error(`[SyncEngine] Error processing item ${item.id}:`, error);
+    return false;
+  }
+}
+
+// ... Keep existing individual sync functions (syncWorkoutSession, etc) for fallback ...
+async function syncWorkoutSession(operation: string, data: Record<string, unknown>, id: string): Promise<boolean> {
+    if (operation === 'delete') {
+      const { error } = await supabase.from('workout_sessions').delete().eq('id', id);
+      return !error;
+    }
+    const { error } = await supabase.from('workout_sessions').upsert({ ...data, _offline: false, _pendingsync: false } as never);
+    return !error;
+}
+
+async function syncSessionExercise(operation: string, data: Record<string, unknown>, id: string): Promise<boolean> {
+    if (operation === 'delete') {
+      const { error } = await supabase.from('session_exercises').delete().eq('id', id);
+      return !error;
+    }
+    const { error } = await supabase.from('session_exercises').upsert(data as never);
+    return !error;
+}
+
+async function syncSessionSet(operation: string, data: Record<string, unknown>, id: string): Promise<boolean> {
+    if (operation === 'delete') {
+        const { error } = await supabase.from('session_sets').delete().eq('id', id);
+        return !error;
+    }
+    const { error } = await supabase.from('session_sets').upsert({ ...data, _offline: false, _pendingsync: false } as never);
+    return !error;
+}
+
+/**
  * Start background sync monitor
- * Call this when the app starts
  */
 export function startSyncMonitor(intervalMs: number = 30000): () => void {
   let intervalId: NodeJS.Timeout | null = null;
-  
-  // Initial sync
   processQueue();
-
-  // Set up periodic sync
-  intervalId = setInterval(() => {
-    processQueue();
-  }, intervalMs);
-
-  // Return cleanup function
-  return () => {
-    if (intervalId) {
-      clearInterval(intervalId);
-    }
-  };
+  intervalId = setInterval(() => { processQueue(); }, intervalMs);
+  return () => { if (intervalId) clearInterval(intervalId); };
 }
+

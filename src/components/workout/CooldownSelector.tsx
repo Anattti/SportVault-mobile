@@ -3,7 +3,8 @@
  * Allows users to select cooldown exercises after completing workout
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -31,9 +32,16 @@ interface CooldownSelectorProps {
 }
 
 export function CooldownSelector({ visible, onClose, onStart, onSkip }: CooldownSelectorProps) {
+  const { t } = useTranslation();
+  
+  const TRANSLATED_COOLDOWN_PRESETS = useMemo(() => COOLDOWN_PRESETS.map(ex => ({
+    ...ex,
+    name: t(`session.warmup_cooldown.presets.${ex.id.replace('cooldown-', '')}` as any, { defaultValue: ex.name })
+  })), [t]);
+
   const [selectedExercises, setSelectedExercises] = useState<WarmupCooldownExercise[]>([
-    COOLDOWN_PRESETS[0], // Pre-select walking
-    COOLDOWN_PRESETS[1], // Pre-select hamstring stretch
+    TRANSLATED_COOLDOWN_PRESETS[0], // Pre-select walking
+    TRANSLATED_COOLDOWN_PRESETS[1], // Pre-select hamstring stretch
   ]);
 
   const toggleExercise = (exercise: WarmupCooldownExercise) => {
@@ -59,7 +67,7 @@ export function CooldownSelector({ visible, onClose, onStart, onSkip }: Cooldown
         <View style={styles.header}>
           <View style={styles.headerTitle}>
             <ThermometerSnowflake size={24} color="#60A5FA" />
-            <Text style={styles.title}>Jäähdyttely</Text>
+            <Text style={styles.title}>{t('session.cooldown.title')}</Text>
           </View>
           <Pressable style={styles.closeButton} onPress={onClose}>
             <X size={24} color={Colors.text.primary} />
@@ -70,20 +78,22 @@ export function CooldownSelector({ visible, onClose, onStart, onSkip }: Cooldown
         <View style={styles.durationBox}>
           <Clock size={16} color={Colors.text.secondary} />
           <Text style={styles.durationText}>
-            Yhteensä: {formatDuration(totalDuration)}
+            {t('session.cooldown.total')} {formatDuration(totalDuration)}
           </Text>
           <Text style={styles.exerciseCount}>
-            ({selectedExercises.length} liikettä)
+            ({t('session.cooldown.movements_count', { count: selectedExercises.length })})
           </Text>
         </View>
 
         {/* Exercise List */}
         <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>Valitse liikkeet</Text>
+          <Text style={styles.sectionTitle}>{t('session.cooldown.select_movements')}</Text>
           
-          {COOLDOWN_PRESETS.map(exercise => {
+          {TRANSLATED_COOLDOWN_PRESETS.map(exercise => {
             const isSelected = selectedExercises.some(e => e.id === exercise.id);
             const typeColor = getTypeColor(exercise.type);
+            
+            const translatedType = t(`session.warmup_cooldown.types.${exercise.type}` as any, { defaultValue: exercise.type });
             
             return (
               <Pressable
@@ -99,7 +109,7 @@ export function CooldownSelector({ visible, onClose, onStart, onSkip }: Cooldown
                     style={[styles.typeBadge, { backgroundColor: `${typeColor}20` }]}
                   >
                     <Text style={[styles.typeText, { color: typeColor }]}>
-                      {getTypeLabel(exercise.type)}
+                      {translatedType}
                     </Text>
                   </View>
                   <Text style={styles.exerciseName}>{exercise.name}</Text>
@@ -124,7 +134,7 @@ export function CooldownSelector({ visible, onClose, onStart, onSkip }: Cooldown
         {/* Bottom Actions */}
         <View style={styles.actions}>
           <Pressable style={styles.skipButton} onPress={onSkip}>
-            <Text style={styles.skipButtonText}>Ohita</Text>
+            <Text style={styles.skipButtonText}>{t('session.cooldown.skip')}</Text>
           </Pressable>
           
           <Pressable
@@ -137,7 +147,7 @@ export function CooldownSelector({ visible, onClose, onStart, onSkip }: Cooldown
           >
             <ThermometerSnowflake size={18} color="#000" />
             <Text style={styles.startButtonText}>
-              Aloita jäähdyttely
+              {t('session.cooldown.start')}
             </Text>
           </Pressable>
         </View>

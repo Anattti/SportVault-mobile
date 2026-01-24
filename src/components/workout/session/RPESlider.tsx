@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, Pressable, GestureResponderEvent } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
@@ -8,25 +9,26 @@ interface RPESliderProps {
   onChange: (value: number) => void;
 }
 
-const RPE_INFO = [
-  { text: 'Erittäin kevyt 😌', color: '#4ADE80' },
-  { text: 'Erittäin kevyt 😌', color: '#4ADE80' },
-  { text: 'Kevyt rasitus 🤏', color: '#86EFAC' },
-  { text: 'Kevyt rasitus 🤏', color: '#86EFAC' },
-  { text: 'Kohtalainen 🤨', color: '#FACC15' },
-  { text: 'Kohtalainen 🤨', color: '#FACC15' },
-  { text: 'Raskas 💪', color: '#F97316' },
-  { text: 'Raskas 💪', color: '#F97316' },
-  { text: 'Hyvin raskas 🔥', color: '#EF4444' },
-  { text: 'Maksimi 💥', color: '#DC2626' },
-];
-
 export function RPESlider({ value, onChange }: RPESliderProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<View>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const lastValueRef = useRef(value);
 
-  const currentInfo = RPE_INFO[Math.min(value - 1, 9)];
+  const rpeInfo = useMemo(() => [
+    { text: t('session.rpe.very_light'), color: '#4ADE80' },
+    { text: t('session.rpe.very_light'), color: '#4ADE80' },
+    { text: t('session.rpe.light_exertion'), color: '#86EFAC' },
+    { text: t('session.rpe.light_exertion'), color: '#86EFAC' },
+    { text: t('session.rpe.moderate'), color: '#FACC15' },
+    { text: t('session.rpe.moderate'), color: '#FACC15' },
+    { text: t('session.rpe.hard'), color: '#F97316' },
+    { text: t('session.rpe.hard'), color: '#F97316' },
+    { text: t('session.rpe.very_hard'), color: '#EF4444' },
+    { text: t('session.rpe.max'), color: '#DC2626' },
+  ], [t]);
+
+  const currentInfo = rpeInfo[Math.min(value - 1, 9)];
 
   const calculateValue = useCallback((pageX: number, containerPageX: number) => {
     const relativeX = pageX - containerPageX;
@@ -59,7 +61,7 @@ export function RPESlider({ value, onChange }: RPESliderProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>RPE</Text>
+      <Text style={styles.label}>{t('session.rpe.title')}</Text>
       
       {/* Header Info */}
       <View style={styles.headerRow}>
@@ -112,8 +114,8 @@ export function RPESlider({ value, onChange }: RPESliderProps) {
 
       {/* Labels */}
       <View style={styles.labelsRow}>
-        <Text style={styles.endLabel}>Kevyt</Text>
-        <Text style={styles.endLabel}>Raskas</Text>
+        <Text style={styles.endLabel}>{t('session.rpe.label_light')}</Text>
+        <Text style={styles.endLabel}>{t('session.rpe.label_hard')}</Text>
       </View>
     </View>
   );

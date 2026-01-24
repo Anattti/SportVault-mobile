@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +10,7 @@ import Animated, {
   interpolate,
   Extrapolation 
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -32,6 +34,7 @@ export function WorkoutControls({
   onMarkComplete,
   onBack,
 }: WorkoutControlsProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   
   // Animation for back button
@@ -64,17 +67,20 @@ export function WorkoutControls({
   const getButtonText = () => {
     if (isSetCompleted) {
       if (isLastSet && isLastExercise) {
-        return 'Lopeta treeni';
+        return t('session.controls.finish_workout');
       }
       if (isLastSet) {
-        return 'Seuraava liike';
+        return t('session.controls.next_exercise');
       }
-      return 'Seuraava sarja';
+      return t('session.controls.next_set');
     }
-    return 'Merkitse suoritetuksi';
+    return t('session.controls.mark_complete');
   };
 
   const handlePress = () => {
+    // Add haptic feedback for primary action
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
     if (isSetCompleted) {
       onComplete();
     } else {

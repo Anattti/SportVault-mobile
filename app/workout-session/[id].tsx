@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,12 +14,14 @@ import { ActiveExerciseCard } from '@/components/workout/session/ActiveExerciseC
 import { RPESlider } from '@/components/workout/session/RPESlider';
 import { RestTimerDisplay } from '@/components/workout/session/RestTimerDisplay';
 import { WorkoutNotes } from '@/components/workout/session/WorkoutNotes';
+import { useQueryClient } from "@tanstack/react-query";
 import { ExerciseReorderModal } from '@/components/workout/session/ExerciseReorderModal';
 import { WarmupPhase, type WarmupPhaseData } from '@/components/workout/WarmupPhase';
 import { WorkoutProgressBar } from '@/components/workout/session/WorkoutProgressBar';
 import type { WorkoutExercise } from '@/types';
 import { Database } from '@/types/supabase';
 import { isOnline, addToQueue } from '@/lib/offlineSync';
+import { workoutHistoryKeys } from '@/hooks/useWorkoutHistory';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -32,9 +35,10 @@ interface ExerciseWithSets extends Exercise {
 type SessionPhase = 'warmup' | 'workout' | 'cooldown' | 'complete';
 
 export default function WorkoutSessionScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { activeSession, startSession, endSession } = useActiveSession();
+  const { activeSession, startSession, endSession, isLoading } = useActiveSession();
   
   const [loading, setLoading] = useState(true);
   const [workoutName, setWorkoutName] = useState('');
@@ -45,10 +49,18 @@ export default function WorkoutSessionScreen() {
   const [notesVisible, setNotesVisible] = useState(false);
 
   useEffect(() => {
-    if (id) {
+    if (id && !isLoading) {
       loadWorkout();
     }
-  }, [id]);
+  }, [id, isLoading]);
+
+  // If resuming an active session, skip directly to workout phase
+  useEffect(() => {
+    if (!isLoading && activeSession && activeSession.workoutId === id && phase === 'warmup') {
+      console.log('Resuming active session, skipping warmup');
+      setPhase('workout');
+    }
+  }, [isLoading, activeSession, id, phase]);
 
   const loadWorkout = async () => {
     try {
@@ -95,7 +107,8 @@ export default function WorkoutSessionScreen() {
 
     } catch (error) {
       console.error("Error loading workout:", error);
-      Alert.alert("Virhe", "Treenin lataus epäonnistui");
+      Alert.alert(t('profile.error'), t('session.alerts.load_error'));
+      endSession();
       router.back();
     } finally {
       setLoading(false);
@@ -124,12 +137,12 @@ export default function WorkoutSessionScreen() {
 
   const handleClose = () => {
     Alert.alert(
-      "Lopeta treeni",
-      "Haluatko lopettaa treenin?",
+      t('session.alerts.finish_title'),
+      t('session.alerts.finish_message'),
       [
-        { text: "Peruuta", style: "cancel" },
-        { text: "Tallenna ja lopeta", onPress: () => endSession() },
-        { text: "Hylkää", style: "destructive", onPress: () => { endSession(); router.back(); } },
+        { text: t('session.alerts.cancel'), style: "cancel" },
+        { text: t('session.alerts.save_and_finish'), onPress: () => endSession() },
+        { text: t('session.alerts.discard'), style: "destructive", onPress: () => { endSession(); router.back(); } },
       ]
     );
   };
@@ -140,7 +153,7 @@ export default function WorkoutSessionScreen() {
     // The actual save is handled inside WorkoutSessionContent
   };
 
-  if (loading || exercises.length === 0) {
+  if (loading || isLoading || exercises.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator color={Colors.neon.DEFAULT} size="large" />
@@ -176,6 +189,13 @@ export default function WorkoutSessionScreen() {
   return (
     <WorkoutSessionContent
       exercises={activeSession?.exercises || exercises}
+      initialState={activeSession?.workoutId === id ? {
+        setResults: activeSession.setResults,
+        currentExerciseIndex: activeSession.currentExerciseIndex,
+        currentSetIndex: activeSession.currentSetIndex,
+        orderedExercises: activeSession.exercises,
+        exerciseNotes: activeSession.exerciseNotes,
+      } : undefined}
       workoutName={workoutName}
       workoutId={id!}
       onClose={handleClose}
@@ -204,8 +224,16 @@ function WorkoutSessionContent({
   shouldAutoSave,
   notesVisible,
   onToggleNotes,
+  initialState,
 }: {
   exercises: WorkoutExercise[];
+  initialState?: {
+    setResults: unknown[][]; // typed as SetResult[][] but unknown here to avoid import
+    currentExerciseIndex: number;
+    currentSetIndex: number;
+    orderedExercises: WorkoutExercise[];
+    exerciseNotes: Record<number, string>;
+  };
   workoutName: string;
   workoutId: string;
   onClose: () => void;
@@ -216,9 +244,11 @@ function WorkoutSessionContent({
   notesVisible: boolean;
   onToggleNotes: () => void;
 }) {
+  const { t } = useTranslation();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { endSession } = useActiveSession();
+  const { endSession, updateSession } = useActiveSession();
 
   const playCompleteSound = async () => {
     try {
@@ -241,7 +271,10 @@ function WorkoutSessionContent({
     },
   });
 
-  const workoutState = useWorkoutState({ exercises });
+  const workoutState = useWorkoutState({ 
+    exercises,
+    initialState: initialState as any // Cast because of import complexity, types match runtime
+  });
 
   const [reorderModalVisible, setReorderModalVisible] = useState(false);
 
@@ -249,6 +282,25 @@ function WorkoutSessionContent({
     workoutState.reorderExercises(newOrder);
     setReorderModalVisible(false);
   };
+
+  // Sync state to global context (and persistence)
+  useEffect(() => {
+    // We only want to update if we are in a valid session matching this workout
+    // and if there are actual changes to avoid loops (though updateSession uses setState)
+    updateSession({
+      setResults: workoutState.setResults,
+      currentExerciseIndex: workoutState.currentExerciseIndex,
+      currentSetIndex: workoutState.currentSetIndex,
+      exercises: workoutState.orderedExercises, // Save reordered exercises
+      exerciseNotes: workoutState.exerciseNotes,
+    });
+  }, [
+    workoutState.setResults, 
+    workoutState.currentExerciseIndex, 
+    workoutState.currentSetIndex,
+    workoutState.orderedExercises,
+    updateSession
+  ]);
 
   // Auto-save when cooldown is complete
   useEffect(() => {
@@ -264,8 +316,13 @@ function WorkoutSessionContent({
     }
     endSession();
     if (sessionId) {
+      await queryClient.invalidateQueries({ queryKey: ['workout_details', workoutId] });
+      await queryClient.invalidateQueries({ queryKey: ['workouts'] });
+      await queryClient.invalidateQueries({ queryKey: workoutHistoryKeys.all });
       router.replace(`/(dashboard)/workouts/session/${sessionId}`);
     } else {
+      await queryClient.invalidateQueries({ queryKey: ['workout_details', workoutId] });
+      await queryClient.invalidateQueries({ queryKey: ['workouts'] });
       router.back();
     }
   };
@@ -288,63 +345,69 @@ function WorkoutSessionContent({
       const online = await isOnline();
 
       if (online) {
-        // === ONLINE PATH: Direct Supabase writes ===
+        // === ONLINE PATH: Atomic RPC write ===
         
-        // 1. MAIN WRITE: New Schema (workout_sessions)
-        const { data: sessionData, error: sessionError } = await supabase
-          .from("workout_sessions")
-          .insert({
+        // 1. Prepare payload with pre-generated IDs
+        const exercisesPayload: any[] = [];
+        const setsPayload: any[] = [];
+
+        for (let exIdx = 0; exIdx < workoutState.orderedExercises.length; exIdx++) {
+          const exercise = workoutState.orderedExercises[exIdx];
+          const exId = uuidv4();
+          
+          exercisesPayload.push({
+            id: exId,
+            session_id: sessionId,
+            exercise_id: exercise.id,
+            name: exercise.name,
+            order_index: exIdx,
+            notes: workoutState.exerciseNotes[exIdx] || null,
+            created_at: sessionDate, // Use session date for consistency
+          });
+
+          const completedSets = (workoutState.setResults[exIdx] || [])
+            .filter(r => r.completed)
+            .map((result) => ({
+              id: uuidv4(),
+              session_exercise_id: exId,
+              sets_completed: 1, // Individual set record
+              weight_used: result.weight,
+              reps_completed: result.reps,
+              rpe: result.rpe,
+              notes: result.notes || null,
+              created_at: sessionDate,
+              completed_at: new Date().toISOString(),
+            }));
+
+          setsPayload.push(...completedSets);
+        }
+
+        const payload = {
+          session: {
             id: sessionId,
             user_id: user.id,
             workout_id: workoutId,
             duration: totalDuration,
             date: sessionDate,
             total_volume: totalVolume,
-            _offline: false,
-            _pendingsync: false,
-          })
-          .select()
-          .single();
+            feeling: 3, // Default feeling, could be linked to a UI selector later
+            rpe_average: setsPayload.length > 0 
+              ? (setsPayload.reduce((acc, s) => acc + (s.rpe || 0), 0) / setsPayload.length).toFixed(1)
+              : 0,
+            warmup: warmupData || null,
+            cooldown: cooldownData || null,
+            created_at: sessionDate,
+          },
+          exercises: exercisesPayload,
+          sets: setsPayload
+        };
 
-        if (sessionError) throw sessionError;
+        // 2. MAIN WRITE: Atomic RPC
+        const { data: rpcData, error: rpcError } = await supabase.rpc('save_full_workout_session', { payload });
 
-        // 2. Insert exercises and sets for New Schema
-        for (let exIdx = 0; exIdx < workoutState.orderedExercises.length; exIdx++) {
-          const exercise = workoutState.orderedExercises[exIdx];
-          const { data: exData, error: exError } = await supabase
-            .from("session_exercises")
-            .insert({
-              session_id: sessionData.id,
-              exercise_id: exercise.id,
-              name: exercise.name,
-              order_index: exIdx,
-              notes: workoutState.exerciseNotes[exIdx] || null,
-            })
-            .select()
-            .single();
-
-          if (exError) throw exError;
-
-          const setsToInsert = (workoutState.setResults[exIdx] || [])
-            .filter(r => r.completed)
-            .map((result) => ({
-              session_exercise_id: exData.id,
-              weight_used: result.weight,
-              reps_completed: result.reps,
-              rpe: result.rpe,
-              notes: result.notes || null,
-              completed_at: new Date().toISOString(),
-              _offline: false,
-              _pendingsync: false,
-            }));
-
-          if (setsToInsert.length > 0) {
-            const { error: setsError } = await supabase
-              .from("session_sets")
-              .insert(setsToInsert);
-
-            if (setsError) throw setsError;
-          }
+        if (rpcError) throw rpcError;
+        if (rpcData && rpcData.success === false) {
+          throw new Error(rpcData.error || 'RPC save failed');
         }
 
         // 3. LEGACY WRITE: Old Schema (workout_results) - best effort
@@ -393,7 +456,7 @@ function WorkoutSessionContent({
           console.error("Legacy write crash:", legacyCatchError);
         }
 
-        return sessionData.id;
+        return sessionId;
         
       } else {
         // === OFFLINE PATH: Queue to sync later ===
@@ -474,15 +537,15 @@ function WorkoutSessionContent({
         }
 
         Alert.alert(
-          "Tallennettu paikallisesti",
-          "Treeni tallennetaan Supabaseen kun verkkoyhteys palautuu."
+          t('session.alerts.offline_saved_title'),
+          t('session.alerts.offline_saved_message')
         );
 
         return sessionId;
       }
     } catch (error) {
       console.error("Error saving session:", error);
-      Alert.alert("Virhe", "Treenin tallennus epäonnistui. Tarkista verkkoyhteys.");
+      Alert.alert(t('profile.error'), t('session.alerts.save_error'));
       return null;
     }
   };

@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
 import { WifiOff, CloudOff, RefreshCw } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
@@ -14,6 +15,7 @@ interface OfflineIndicatorProps {
 }
 
 export function OfflineIndicator({ showPendingCount = true }: OfflineIndicatorProps) {
+  const { t } = useTranslation();
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -74,14 +76,14 @@ export function OfflineIndicator({ showPendingCount = true }: OfflineIndicatorPr
           <>
             <WifiOff size={16} color="#FFFFFF" />
             <Text style={styles.text}>
-              Ei verkkoyhteyttä
+              {t('offline.no_connection')}
             </Text>
           </>
         ) : (
           <>
             <CloudOff size={16} color="#FFFFFF" />
             <Text style={styles.text}>
-              {pendingCount} synkronoimatonta treeniä
+              {t('offline.pending_sync', { count: pendingCount })}
             </Text>
           </>
         )}
@@ -99,7 +101,7 @@ export function OfflineIndicator({ showPendingCount = true }: OfflineIndicatorPr
             style={isSyncing ? styles.spinning : undefined}
           />
           <Text style={styles.syncButtonText}>
-            {isSyncing ? 'Synkronoidaan...' : 'Synkronoi'}
+            {isSyncing ? t('offline.syncing') : t('offline.sync_button')}
           </Text>
         </Pressable>
       )}

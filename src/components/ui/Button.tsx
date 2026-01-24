@@ -1,11 +1,11 @@
-import { Text, Pressable, PressableProps, StyleSheet, ViewStyle, TextStyle, ActivityIndicator } from "react-native";
+import { Text, Pressable, PressableProps, StyleSheet, ViewStyle, TextStyle, ActivityIndicator, StyleProp } from "react-native";
 import { Colors } from "@/constants/Colors";
 
 interface ButtonProps extends PressableProps {
   variant?: "primary" | "secondary" | "outline" | "ghost";
   size?: "default" | "sm" | "lg" | "icon";
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   textStyle?: TextStyle;
   loading?: boolean;
 }

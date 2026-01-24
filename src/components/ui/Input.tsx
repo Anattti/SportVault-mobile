@@ -22,6 +22,7 @@ export function Input({ style, label, error, leftIcon, ...props }: InputProps) {
         {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
         <TextInput
           placeholderTextColor="#71717a" // zinc-500
+          keyboardAppearance="dark"
           style={[
             styles.input,
             style

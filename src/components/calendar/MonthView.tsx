@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { CalendarMonth } from '@/types/calendar';
@@ -12,11 +13,22 @@ interface MonthViewProps {
 }
 
 export function MonthView({ calendarMonth, onDayPress }: MonthViewProps) {
+  const { t } = useTranslation();
   // OPTIMIZED: Use useWindowDimensions for responsive sizing on rotation/foldables
   const { width } = useWindowDimensions();
   const CELL_SIZE = (width - 32) / 7;
 
-  const weekdays = getWeekdayNames();
+  // Week starts on Monday in this app logic (Ma, Ti, Ke, To, Pe, La, Su)
+  // Mapping Ma -> nav.mon equivalent
+  const weekdays = useMemo(() => [
+    t('calendar.weekdays.1'),
+    t('calendar.weekdays.2'),
+    t('calendar.weekdays.3'),
+    t('calendar.weekdays.4'),
+    t('calendar.weekdays.5'),
+    t('calendar.weekdays.6'),
+    t('calendar.weekdays.0'),
+  ], [t]);
   
   // Split days into weeks (7 days each)
   const weeks: CalendarDay[][] = [];

@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -26,6 +27,7 @@ import {
   getExerciseE1RMTrend,
   type WorkoutSessionWithSets,
 } from '@/lib/analytics';
+import { DashboardHeader } from '@/components/layout/DashboardHeader';
 
 // Simple bar chart component
 function SimpleBarChart({ data, maxValue }: { data: { label: string; value: number }[]; maxValue: number }) {
@@ -82,6 +84,7 @@ const chartStyles = StyleSheet.create({
 });
 
 export default function AnalyticsScreen() {
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   const { data: analyticsData, isLoading, refetch, isRefetching } = useQuery({
@@ -305,6 +308,7 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={styles.safeArea}>
+      <DashboardHeader />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -319,9 +323,9 @@ export default function AnalyticsScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Analytiikka</Text>
+          <Text style={styles.headerTitle}>{t('analytics.title')}</Text>
           <Text style={styles.headerSubtitle}>
-            {analyticsData?.length || 0} treeniä analysoitu
+            {t('analytics.workouts_analyzed', { count: analyticsData?.length || 0 })}
           </Text>
         </View>
 
@@ -330,11 +334,10 @@ export default function AnalyticsScreen() {
           <View style={styles.alertCard}>
             <View style={styles.alertHeader}>
               <AlertTriangle size={20} color="#F59E0B" />
-              <Text style={styles.alertTitle}>Volyymi kasvanut</Text>
+              <Text style={styles.alertTitle}>{t('analytics.volume_increased')}</Text>
             </View>
             <Text style={styles.alertText}>
-              Viikon volyymi on {Math.round(volumeSpike.percentChange)}% korkeampi kuin keskiarvo.
-              Huolehdi palautumisesta.
+              {t('analytics.volume_spike_desc', { percent: Math.round(volumeSpike.percentChange) })}
             </Text>
           </View>
         )}
@@ -344,11 +347,11 @@ export default function AnalyticsScreen() {
           <View style={styles.chartHeader}>
             <View style={styles.chartTitleRow}>
               <Zap size={18} color={Colors.neon.DEFAULT} />
-              <Text style={styles.chartTitle}>Viikkovolyymi</Text>
+              <Text style={styles.chartTitle}>{t('analytics.weekly_volume')}</Text>
             </View>
             {weeklyVolume.length > 0 && (
               <Text style={styles.chartValue}>
-                {formatVolume(weeklyVolume[weeklyVolume.length - 1]?.volume || 0)} ton
+                {formatVolume(weeklyVolume[weeklyVolume.length - 1]?.volume || 0)} {t('analytics.ton')}
               </Text>
             )}
           </View>
@@ -359,14 +362,14 @@ export default function AnalyticsScreen() {
               maxValue={maxVolume}
             />
           ) : (
-            <Text style={styles.noDataText}>Ei tarpeeksi dataa</Text>
+            <Text style={styles.noDataText}>{t('analytics.not_enough_data')}</Text>
           )}
         </View>
 
         {/* E1RM Trends */}
         <View style={styles.sectionHeader}>
           <Target size={18} color={Colors.text.secondary} />
-          <Text style={styles.sectionTitle}>1RM Kehitys</Text>
+          <Text style={styles.sectionTitle}>{t('analytics.one_rm_progression')}</Text>
         </View>
 
         {e1rmTrends.length > 0 ? (
@@ -382,20 +385,20 @@ export default function AnalyticsScreen() {
               </View>
               <View style={styles.trendStats}>
                 <View style={styles.trendStat}>
-                  <Text style={styles.trendStatLabel}>Nykyinen</Text>
-                  <Text style={styles.trendStatValue}>{trend.currentE1RM} kg</Text>
+                  <Text style={styles.trendStatLabel}>{t('analytics.current')}</Text>
+                  <Text style={styles.trendStatValue}>{trend.currentE1RM} {t('calculator.unit_kg')}</Text>
                 </View>
                 <View style={styles.trendStat}>
-                  <Text style={styles.trendStatLabel}>PR</Text>
+                  <Text style={styles.trendStatLabel}>{t('analytics.pr')}</Text>
                   <Text style={[styles.trendStatValue, { color: Colors.neon.DEFAULT }]}>
-                    {trend.bestE1RM} kg
+                    {trend.bestE1RM} {t('calculator.unit_kg')}
                   </Text>
                 </View>
               </View>
             </View>
           ))
         ) : (
-          <Text style={styles.noDataText}>Ei tarpeeksi treenidataa</Text>
+          <Text style={styles.noDataText}>{t('analytics.not_enough_workout_data')}</Text>
         )}
 
         {/* Plateau Warnings */}
@@ -403,16 +406,18 @@ export default function AnalyticsScreen() {
           <>
             <View style={styles.sectionHeader}>
               <AlertTriangle size={18} color="#F59E0B" />
-              <Text style={styles.sectionTitle}>Tasannevaroitukset</Text>
+              <Text style={styles.sectionTitle}>{t('analytics.plateau_warnings')}</Text>
             </View>
 
             {plateaus.map((plateau, index) => (
               <View key={index} style={styles.plateauCard}>
                 <Text style={styles.plateauExercise}>{plateau.exerciseName}</Text>
                 <Text style={styles.plateauDuration}>
-                  {plateau.stagnantWeeks} viikkoa ilman kehitystä
+                  {t('analytics.weeks_without_progress', { weeks: plateau.stagnantWeeks })}
                 </Text>
-                <Text style={styles.plateauSuggestion}>{plateau.suggestion}</Text>
+                <Text style={styles.plateauSuggestion}>
+                  {t(plateau.suggestionKey, plateau.suggestionParams)}
+                </Text>
               </View>
             ))}
           </>

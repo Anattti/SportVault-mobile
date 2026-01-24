@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -20,20 +22,20 @@ export default function LoginScreen() {
 
   const validate = () => {
     const newErrors: { email?: string; username?: string; password?: string; confirmPassword?: string } = {};
-    if (!email) newErrors.email = 'Sähköposti on pakollinen';
-    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Virheellinen sähköposti';
+    if (!email) newErrors.email = t('auth.errors.email_required');
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = t('auth.errors.invalid_email');
     
     if (mode === 'register') {
-      if (!username) newErrors.username = 'Käyttäjänimi on pakollinen';
-      else if (username.length < 3) newErrors.username = 'Käyttäjänimen on oltava vähintään 3 merkkiä';
-      else if (!/^[a-zA-Z0-9_]+$/.test(username)) newErrors.username = 'Vain kirjaimia, numeroita ja alaviivoja';
+      if (!username) newErrors.username = t('auth.errors.username_required');
+      else if (username.length < 3) newErrors.username = t('auth.errors.username_min');
+      else if (!/^[a-zA-Z0-9_]+$/.test(username)) newErrors.username = t('auth.errors.username_invalid');
       
-      if (!confirmPassword) newErrors.confirmPassword = 'Vahvista salasana';
-      else if (password !== confirmPassword) newErrors.confirmPassword = 'Salasanat eivät täsmää';
+      if (!confirmPassword) newErrors.confirmPassword = t('auth.errors.confirm_password_required');
+      else if (password !== confirmPassword) newErrors.confirmPassword = t('auth.errors.passwords_dont_match');
     }
     
-    if (!password) newErrors.password = 'Salasana on pakollinen';
-    else if (password.length < 6) newErrors.password = 'Salasanan on oltava vähintään 6 merkkiä';
+    if (!password) newErrors.password = t('auth.errors.password_required');
+    else if (password.length < 6) newErrors.password = t('auth.errors.password_min');
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -76,12 +78,12 @@ export default function LoginScreen() {
               console.warn('Profile creation failed:', profileError.message);
             }
           }
-          Alert.alert('Rekisteröityminen onnistui', 'Tarkista sähköpostisi vahvistuslinkkiä varten.');
+          Alert.alert(t('auth.alerts.register_success'), t('auth.alerts.check_email'));
           setMode('login');
         }
       }
     } catch (error: any) {
-      Alert.alert('Virhe', error.message);
+      Alert.alert(t('profile.error'), error.message);
     } finally {
       setLoading(false);
     }
@@ -98,7 +100,7 @@ export default function LoginScreen() {
             <Text style={styles.logoText}>SportVault</Text>
             <Zap color={Colors.neon.DEFAULT} size={32} fill={Colors.neon.DEFAULT} />
           </View>
-          <Text style={styles.subtitle}>Hallitse treenejäsi ammattimaisesti</Text>
+          <Text style={styles.subtitle}>{t('auth.subtitle')}</Text>
         </View>
 
         <Card style={styles.card} glass={false}>
@@ -107,19 +109,19 @@ export default function LoginScreen() {
               style={[styles.tab, mode === 'login' && styles.activeTab]} 
               onPress={() => setMode('login')}
             >
-              <Text style={[styles.tabText, mode === 'login' && styles.activeTabText]}>Kirjaudu</Text>
+              <Text style={[styles.tabText, mode === 'login' && styles.activeTabText]}>{t('auth.login')}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.tab, mode === 'register' && styles.activeTab]} 
               onPress={() => setMode('register')}
             >
-              <Text style={[styles.tabText, mode === 'register' && styles.activeTabText]}>Rekisteröidy</Text>
+              <Text style={[styles.tabText, mode === 'register' && styles.activeTabText]}>{t('auth.register')}</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>SÄHKÖPOSTI</Text>
+              <Text style={styles.label}>{t('auth.email').toUpperCase()}</Text>
               <Input
                 placeholder="nimi@sportvault.fi"
                 value={email}
@@ -133,9 +135,9 @@ export default function LoginScreen() {
 
             {mode === 'register' && (
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>KÄYTTÄJÄNIMI</Text>
+                <Text style={styles.label}>{t('auth.username').toUpperCase()}</Text>
                 <Input
-                  placeholder="Käyttäjänimi"
+                  placeholder={t('auth.username')}
                   value={username}
                   onChangeText={setUsername}
                   autoCapitalize="none"
@@ -146,7 +148,7 @@ export default function LoginScreen() {
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>SALASANA</Text>
+              <Text style={styles.label}>{t('auth.password').toUpperCase()}</Text>
               <Input
                 placeholder="••••••••"
                 value={password}
@@ -159,7 +161,7 @@ export default function LoginScreen() {
 
             {mode === 'register' && (
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>VAHVISTA SALASANA</Text>
+                <Text style={styles.label}>{t('auth.confirm_password').toUpperCase()}</Text>
                 <Input
                   placeholder="••••••••"
                   value={confirmPassword}
@@ -178,7 +180,7 @@ export default function LoginScreen() {
             >
               <View style={styles.buttonContent}>
                 <Text style={styles.buttonText}>
-                  {mode === 'login' ? 'Kirjaudu sisään' : 'Luo tili'}
+                  {mode === 'login' ? t('auth.login_button') : t('auth.register_button')}
                 </Text>
                 <ArrowRight color="#000" size={20} />
               </View>
@@ -186,7 +188,7 @@ export default function LoginScreen() {
 
             {mode === 'login' && (
               <TouchableOpacity style={styles.forgotPassword}>
-                <Text style={styles.forgotPasswordText}>Unohditko salasanan?</Text>
+                <Text style={styles.forgotPasswordText}>{t('auth.forgot_password')}</Text>
               </TouchableOpacity>
             )}
           </View>

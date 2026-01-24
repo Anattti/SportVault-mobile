@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, RefreshControl } from "react-native";
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Colors } from "@/constants/Colors";
 import { Spacing } from "@/constants/Layout";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -47,23 +48,24 @@ function StatCard({ title, value, subValue, icon, trend, trendType }: StatCardPr
   );
 }
 
-function formatDuration(totalSeconds: number): string {
+function formatDuration(totalSeconds: number, t: any): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   if (h > 0) {
-    return `${h}h ${m}min`;
+    return `${h}${t('workouts.hours')} ${m}${t('workouts.minutes')}`;
   }
-  return `${m}min`;
+  return `${m}${t('workouts.minutes')}`;
 }
 
-function formatVolume(kg: number): string {
+function formatVolume(kg: number, t: any): string {
   if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(1)}k kg`;
+    return `${(kg / 1000).toFixed(1)}k ${t('calculator.unit_kg')}`;
   }
-  return `${Math.round(kg)} kg`;
+  return `${Math.round(kg)} ${t('calculator.unit_kg')}`;
 }
 
 export default function StatsScreen() {
+  const { t } = useTranslation();
   const { data, isLoading, refetch, isRefetching } = useStatsData();
 
   const onRefresh = useCallback(() => {
@@ -74,7 +76,7 @@ export default function StatsScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Tilastot</Text>
+          <Text style={styles.headerTitle}>{t('stats.title')}</Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.neon.DEFAULT} />
@@ -92,7 +94,7 @@ export default function StatsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tilastot</Text>
+        <Text style={styles.headerTitle}>{t('stats.title')}</Text>
       </View>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
@@ -101,29 +103,29 @@ export default function StatsScreen() {
         }
       >
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Yleisnäkymä</Text>
+          <Text style={styles.sectionTitle}>{t('stats.overview')}</Text>
         </View>
 
         <View style={styles.grid}>
           <StatCard 
-            title="Treenejä tällä viikolla" 
+            title={t('stats.weekly_workouts')} 
             value={String(currentWeek.sessionCount)} 
             icon={<BarChart3 size={20} color={Colors.neon.DEFAULT} />}
           />
           <StatCard 
-            title="Treeniaika tällä viikolla" 
-            value={formatDuration(currentWeek.totalDuration)} 
+            title={t('stats.weekly_duration')} 
+            value={formatDuration(currentWeek.totalDuration, t)} 
             icon={<Clock size={20} color={Colors.neon.DEFAULT} />}
           />
           <StatCard 
-            title="Kokonaiskuorma tällä viikolla" 
-            value={formatVolume(currentWeek.totalVolume)} 
+            title={t('stats.weekly_volume')} 
+            value={formatVolume(currentWeek.totalVolume, t)} 
             icon={<Weight size={20} color={Colors.neon.DEFAULT} />}
           />
           <StatCard 
-            title="Progressio" 
+            title={t('stats.progression')} 
             value={`${progressionPercent >= 0 ? "+" : ""}${progressionPercent.toFixed(1)}%`} 
-            trend="vs. viime viikko"
+            trend={t('stats.vs_last_week')}
             trendType={progressionTrendType}
             icon={<TrendingUp size={20} color={Colors.neon.DEFAULT} />}
           />
@@ -132,18 +134,18 @@ export default function StatsScreen() {
         <View style={styles.sectionHeader}>
           <View style={styles.titleWithIcon}>
             <Target size={20} color={Colors.neon.DEFAULT} />
-            <Text style={styles.sectionTitle}>Tavoitteet</Text>
+            <Text style={styles.sectionTitle}>{t('stats.goals')}</Text>
           </View>
           <Button variant="ghost" size="sm" style={styles.addBtn}>
             <Plus size={16} color={Colors.neon.DEFAULT} />
-            <Text style={styles.addBtnText}>Uusi tavoite</Text>
+            <Text style={styles.addBtnText}>{t('stats.new_goal')}</Text>
           </Button>
         </View>
 
         {goals.length === 0 ? (
           <Card style={styles.goalCard} glass={true}>
             <CardContent style={styles.goalContent}>
-              <Text style={styles.emptyGoalsText}>Ei aktiivisia tavoitteita</Text>
+              <Text style={styles.emptyGoalsText}>{t('stats.no_active_goals')}</Text>
             </CardContent>
           </Card>
         ) : (

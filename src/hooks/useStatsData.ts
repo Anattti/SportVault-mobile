@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { useMemo } from "react";
+import { useWorkoutStats } from "./useWorkoutHistory";
 import { useAuth } from "@/context/AuthContext";
 import { Database } from "@/types/supabase";
 
@@ -17,6 +17,8 @@ interface StatsData {
   previousWeek: WeeklyStats;
   progressionPercent: number;
   goals: Goal[];
+  isLoading: boolean;
+  isError: boolean;
 }
 
 function getWeekBounds(weeksAgo: number = 0): { start: Date; end: Date } {
@@ -30,7 +32,7 @@ function getWeekBounds(weeksAgo: number = 0): { start: Date; end: Date } {
   
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 7);
-  weekEnd.setHours(0, 0, 0, 0);
+  weekEnd.setHours(23, 59, 59, 999); // Inclusion of full Sunday
   
   return { start: weekStart, end: weekEnd };
 }
@@ -46,70 +48,71 @@ function calculateWeeklyStats(sessions: WorkoutSession[]): WeeklyStats {
   );
 }
 
-export function useStatsData() {
+export function useStatsData(): StatsData {
   const { user } = useAuth();
+  
+  const currentWeekBounds = useMemo(() => getWeekBounds(0), []);
+  const previousWeekBounds = useMemo(() => getWeekBounds(1), []);
 
-  return useQuery<StatsData>({
-    queryKey: ["stats_data", user?.id],
+  // Use the centralized hook for data fetching
+  const { data: sessions, isLoading: sessionsLoading, isError: sessionsError } = useWorkoutStats(
+    previousWeekBounds.start.toISOString(),
+    currentWeekBounds.end.toISOString()
+  );
+
+  // Fetch goals (remains local as it's specific to stats/dashboard)
+  const { data: goals, isLoading: goalsLoading, isError: goalsError } = useQuery({
+    queryKey: ["goals_data", user?.id],
     queryFn: async () => {
-      if (!user?.id) {
-        throw new Error("User not authenticated");
-      }
-
-      const currentWeekBounds = getWeekBounds(0);
-      const previousWeekBounds = getWeekBounds(1);
-
-      // Fetch sessions from last 2 weeks
-      const { data: sessions, error: sessionsError } = await supabase
-        .from("workout_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("date", previousWeekBounds.start.toISOString())
-        .lt("date", currentWeekBounds.end.toISOString())
-        .order("date", { ascending: false });
-
-      if (sessionsError) throw sessionsError;
-
-      // Split sessions by week
-      const currentWeekSessions = (sessions || []).filter((s) => {
-        const sessionDate = new Date(s.date || s.created_at || "");
-        return sessionDate >= currentWeekBounds.start && sessionDate < currentWeekBounds.end;
-      });
-
-      const previousWeekSessions = (sessions || []).filter((s) => {
-        const sessionDate = new Date(s.date || s.created_at || "");
-        return sessionDate >= previousWeekBounds.start && sessionDate < previousWeekBounds.end;
-      });
-
-      const currentWeek = calculateWeeklyStats(currentWeekSessions);
-      const previousWeek = calculateWeeklyStats(previousWeekSessions);
-
-      // Calculate progression (volume comparison)
-      let progressionPercent = 0;
-      if (previousWeek.totalVolume > 0) {
-        progressionPercent = ((currentWeek.totalVolume - previousWeek.totalVolume) / previousWeek.totalVolume) * 100;
-      } else if (currentWeek.totalVolume > 0) {
-        progressionPercent = 100; // First week with volume
-      }
-
-      // Fetch user goals
-      const { data: goals, error: goalsError } = await supabase
+      const { data, error } = await supabase
         .from("goals")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", user!.id)
         .eq("is_completed", false)
         .order("created_at", { ascending: false });
-
-      if (goalsError) throw goalsError;
-
-      return {
-        currentWeek,
-        previousWeek,
-        progressionPercent,
-        goals: goals || [],
-      };
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  const stats = useMemo(() => {
+    if (!sessions) return null;
+
+    // Split sessions by week
+    const currentWeekSessions = (sessions || []).filter((s) => {
+      const sessionDate = new Date(s.date || s.created_at || "");
+      return sessionDate >= currentWeekBounds.start && sessionDate < currentWeekBounds.end;
+    });
+
+    const previousWeekSessions = (sessions || []).filter((s) => {
+      const sessionDate = new Date(s.date || s.created_at || "");
+      return sessionDate >= previousWeekBounds.start && sessionDate < previousWeekBounds.end;
+    });
+
+    const currentWeek = calculateWeeklyStats(currentWeekSessions);
+    const previousWeek = calculateWeeklyStats(previousWeekSessions);
+
+    // Calculate progression (volume comparison)
+    let progressionPercent = 0;
+    if (previousWeek.totalVolume > 0) {
+      progressionPercent = ((currentWeek.totalVolume - previousWeek.totalVolume) / previousWeek.totalVolume) * 100;
+    } else if (currentWeek.totalVolume > 0) {
+      progressionPercent = 100;
+    }
+
+    return { currentWeek, previousWeek, progressionPercent };
+  }, [sessions, currentWeekBounds, previousWeekBounds]);
+
+  return {
+    currentWeek: stats?.currentWeek || { sessionCount: 0, totalDuration: 0, totalVolume: 0 },
+    previousWeek: stats?.previousWeek || { sessionCount: 0, totalDuration: 0, totalVolume: 0 },
+    progressionPercent: stats?.progressionPercent || 0,
+    goals: goals || [],
+    isLoading: sessionsLoading || goalsLoading,
+    isError: sessionsError || goalsError,
+  };
 }
+
+import { supabase } from "@/lib/supabase";
+import { useQuery } from "@tanstack/react-query";

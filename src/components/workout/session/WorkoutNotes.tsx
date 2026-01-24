@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import Animated, { 
   useAnimatedStyle, 
@@ -25,6 +26,7 @@ export function WorkoutNotes({
   exerciseNote,
   onExerciseNoteChange,
 }: WorkoutNotesProps) {
+  const { t } = useTranslation();
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -54,12 +56,12 @@ export function WorkoutNotes({
     <Animated.View style={[styles.container, containerStyle]}>
       {/* Set Note Section */}
       <View style={styles.section}>
-        <Text style={styles.label}>Sarjan kommentti</Text>
+        <Text style={styles.label}>{t('session.notes.set_comment')}</Text>
         <TextInput
           style={styles.input}
           value={setNote}
           onChangeText={onSetNoteChange}
-          placeholder="Kirjoita kommentti tähän sarjalle..."
+          placeholder={t('session.notes.set_comment_placeholder')}
           placeholderTextColor={Colors.text.muted}
           multiline
         />
@@ -69,12 +71,12 @@ export function WorkoutNotes({
 
       {/* Exercise Note Section */}
       <View style={styles.section}>
-        <Text style={styles.label}>Muistiinpanot</Text>
+        <Text style={styles.label}>{t('session.notes.exercise_notes')}</Text>
         <TextInput
           style={styles.input}
           value={exerciseNote}
           onChangeText={onExerciseNoteChange}
-          placeholder="Kirjoita muistiinpanot tähän..."
+          placeholder={t('session.notes.exercise_notes_placeholder')}
           placeholderTextColor={Colors.text.muted}
           multiline
         />

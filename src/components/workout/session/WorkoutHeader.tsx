@@ -1,7 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Menu, Plus, Zap } from 'lucide-react-native';
+import { Menu, Plus, Zap } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 
 interface WorkoutHeaderProps {
@@ -19,6 +20,7 @@ export function WorkoutHeader({
   onAddExercise,
   onOpenMenu,
 }: WorkoutHeaderProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   return (
@@ -49,7 +51,7 @@ export function WorkoutHeader({
           </Pressable>
         )}
         <Pressable onPress={onClose}>
-          <Text style={styles.closeText}>Lopeta</Text>
+          <Text style={styles.closeText}>{t('session.header.stop')}</Text>
         </Pressable>
       </View>
     </View>

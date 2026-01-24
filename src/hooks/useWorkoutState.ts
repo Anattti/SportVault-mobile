@@ -3,19 +3,26 @@ import type { WorkoutExercise, SetResult } from '@/types';
 
 interface UseWorkoutStateOptions {
   exercises: WorkoutExercise[];
+  initialState?: {
+    setResults: SetResult[][];
+    currentExerciseIndex: number;
+    currentSetIndex: number;
+    orderedExercises: WorkoutExercise[];
+    exerciseNotes: Record<number, string>;
+  };
   onComplete?: (results: SetResult[][], duration: number) => void;
 }
 
-export function useWorkoutState({ exercises: initialExercises, onComplete }: UseWorkoutStateOptions) {
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  const [currentSetIndex, setCurrentSetIndex] = useState(0);
+export function useWorkoutState({ exercises: initialExercises, initialState, onComplete }: UseWorkoutStateOptions) {
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(initialState?.currentExerciseIndex ?? 0);
+  const [currentSetIndex, setCurrentSetIndex] = useState(initialState?.currentSetIndex ?? 0);
   
   // Ordered exercises (can be reordered during session)
-  const [orderedExercises, setOrderedExercises] = useState<WorkoutExercise[]>(initialExercises);
+  const [orderedExercises, setOrderedExercises] = useState<WorkoutExercise[]>(initialState?.orderedExercises ?? initialExercises);
   
   // Initialize set results for all exercises
   const [setResults, setSetResults] = useState<SetResult[][]>(() => 
-    initialExercises.map(ex => 
+    initialState?.setResults ?? initialExercises.map(ex => 
       ex.sets.map(set => ({
         weight: set.weight,
         reps: set.reps,
@@ -95,7 +102,7 @@ export function useWorkoutState({ exercises: initialExercises, onComplete }: Use
   const isLastExercise = currentExerciseIndex === orderedExercises.length - 1;
   const isFirstStep = currentExerciseIndex === 0 && currentSetIndex === 0;
 
-  const [exerciseNotes, setExerciseNotes] = useState<Record<number, string>>({});
+  const [exerciseNotes, setExerciseNotes] = useState<Record<number, string>>(initialState?.exerciseNotes ?? {});
 
   const updateExerciseNote = useCallback((note: string) => {
     setExerciseNotes(prev => ({
