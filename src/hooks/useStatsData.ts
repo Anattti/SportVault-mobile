@@ -1,9 +1,7 @@
 import { useMemo } from "react";
-import { useWorkoutStats } from "./useWorkoutHistory";
+import { useWorkoutStats, WorkoutSession } from "./useWorkoutHistory";
 import { useAuth } from "@/context/AuthContext";
 import { Database } from "@/types/supabase";
-
-type WorkoutSession = Database["public"]["Tables"]["workout_sessions"]["Row"];
 type Goal = Database["public"]["Tables"]["goals"]["Row"];
 
 interface WeeklyStats {

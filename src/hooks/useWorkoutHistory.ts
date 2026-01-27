@@ -2,10 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
-import { Database } from "@/types/supabase";
+import { Database, Json } from "@/types/supabase";
 
 // Types
 export type WorkoutSessionRow = Database["public"]["Tables"]["workout_sessions"]["Row"];
+export type WorkoutResultRow = Database["public"]["Tables"]["workout_results"]["Row"];
 export type WorkoutRow = Database["public"]["Tables"]["workouts"]["Row"];
 
 export interface WorkoutSession {
@@ -27,6 +28,7 @@ export type SessionExercise = Database["public"]["Tables"]["session_exercises"][
 };
 
 export type FullWorkoutSession = {
+  // We use the simpler interface for the session part to support both sources
   session: WorkoutSessionRow & { workouts: { program: string } | null };
   exercises: SessionExercise[];
 };
@@ -42,8 +44,8 @@ export const workoutHistoryKeys = {
 
 // Data fetching function
 async function fetchWorkoutHistory(userId: string): Promise<WorkoutSession[]> {
-  // Fetch only from workout_sessions (primary table)
-  const { data: sessionData, error: sessionError } = await supabase
+  // Fetch from unified workout_sessions table
+  const { data, error } = await supabase
     .from("workout_sessions")
     .select(`
       id,
@@ -62,15 +64,11 @@ async function fetchWorkoutHistory(userId: string): Promise<WorkoutSession[]> {
     .eq("user_id", userId)
     .order("date", { ascending: false });
 
-  if (sessionError) {
-    throw new Error(`Failed to fetch workout sessions: ${sessionError.message}`);
+  if (error) {
+    throw new Error(`Failed to fetch workout sessions: ${error.message}`);
   }
 
-  if (!sessionData) {
-    return [];
-  }
-
-  return sessionData.map((session) => ({
+  return (data || []).map((session) => ({
     id: session.id,
     date: session.date,
     duration: session.duration,
@@ -174,16 +172,43 @@ export function useWorkoutStats(startDate: string, endDate: string) {
 
   return useQuery({
     queryKey: workoutHistoryKeys.range(user?.id, startDate, endDate),
-    queryFn: async () => {
+    queryFn: async (): Promise<WorkoutSession[]> => {
       const { data, error } = await supabase
         .from("workout_sessions")
-        .select("*")
+        .select(`
+          id,
+          date,
+          duration,
+          total_volume,
+          notes,
+          user_id,
+          workout_id,
+          created_at,
+          workouts (
+            program,
+            workout_type
+          )
+        `)
         .eq("user_id", user!.id)
         .gte("date", startDate)
-        .lt("date", endDate);
+        .lt("date", endDate)
+        .order("date", { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      
+      return (data || []).map((session) => ({
+        id: session.id,
+        date: session.date,
+        duration: session.duration,
+        total_volume: session.total_volume,
+        notes: session.notes,
+        user_id: session.user_id,
+        workout_id: session.workout_id,
+        created_at: session.created_at,
+        workoutName: (session.workouts as any)?.program ?? null,
+        workoutType: (session.workouts as any)?.workout_type ?? null,
+        completionPercentage: 100,
+      }));
     },
     enabled: !!user?.id && !!startDate && !!endDate,
   });

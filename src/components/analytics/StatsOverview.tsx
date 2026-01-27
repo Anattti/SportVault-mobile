@@ -1,12 +1,28 @@
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, ActivityIndicator, RefreshControl } from "react-native";
-import { useCallback } from "react";
+import React from "react";
+import { View, Text, StyleSheet, RefreshControl } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Colors } from "@/constants/Colors";
 import { Spacing } from "@/constants/Layout";
 import { Card, CardContent } from "@/components/ui/Card";
 import { BarChart3, Clock, Weight, TrendingUp, Target, Plus, TrendingDown } from "lucide-react-native";
 import { Button } from "@/components/ui/Button";
-import { useStatsData } from "@/hooks/useStatsData";
+
+interface StatsData {
+  currentWeek: {
+    sessionCount: number;
+    totalDuration: number;
+    totalVolume: number;
+  };
+  progressionPercent: number;
+  goals: any[];
+}
+
+interface StatsOverviewProps {
+  data: StatsData;
+  isLoading: boolean;
+  isRefetching: boolean;
+  onRefresh: () => void;
+}
 
 interface StatCardProps {
   title: string;
@@ -32,6 +48,7 @@ function StatCard({ title, value, subValue, icon, trend, trendType }: StatCardPr
           <Text style={styles.statValue}>{value}</Text>
           {subValue && <Text style={styles.statSubValue}>{subValue}</Text>}
         </View>
+        <View style={{flexGrow: 1}} />
         {trend && (
           <View style={styles.trendRow}>
             <TrendIcon size={12} color={trendColor} />
@@ -64,27 +81,9 @@ function formatVolume(kg: number, t: any): string {
   return `${Math.round(kg)} ${t('calculator.unit_kg')}`;
 }
 
-export default function StatsScreen() {
+export function StatsOverview({ data, isLoading, isRefetching, onRefresh }: StatsOverviewProps) {
   const { t } = useTranslation();
-  const { data, isLoading, refetch, isRefetching } = useStatsData();
-
-  const onRefresh = useCallback(() => {
-    refetch();
-  }, [refetch]);
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('stats.title')}</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.neon.DEFAULT} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  
   const currentWeek = data?.currentWeek ?? { sessionCount: 0, totalDuration: 0, totalVolume: 0 };
   const progressionPercent = data?.progressionPercent ?? 0;
   const goals = data?.goals ?? [];
@@ -92,116 +91,84 @@ export default function StatsScreen() {
   const progressionTrendType = progressionPercent < 0 ? "down" : progressionPercent === 0 ? "warning" : "up";
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('stats.title')}</Text>
+    <View>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{t('stats.overview')}</Text>
       </View>
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={Colors.neon.DEFAULT} />
-        }
-      >
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{t('stats.overview')}</Text>
-        </View>
 
-        <View style={styles.grid}>
-          <StatCard 
-            title={t('stats.weekly_workouts')} 
-            value={String(currentWeek.sessionCount)} 
-            icon={<BarChart3 size={20} color={Colors.neon.DEFAULT} />}
-          />
-          <StatCard 
-            title={t('stats.weekly_duration')} 
-            value={formatDuration(currentWeek.totalDuration, t)} 
-            icon={<Clock size={20} color={Colors.neon.DEFAULT} />}
-          />
-          <StatCard 
-            title={t('stats.weekly_volume')} 
-            value={formatVolume(currentWeek.totalVolume, t)} 
-            icon={<Weight size={20} color={Colors.neon.DEFAULT} />}
-          />
-          <StatCard 
-            title={t('stats.progression')} 
-            value={`${progressionPercent >= 0 ? "+" : ""}${progressionPercent.toFixed(1)}%`} 
-            trend={t('stats.vs_last_week')}
-            trendType={progressionTrendType}
-            icon={<TrendingUp size={20} color={Colors.neon.DEFAULT} />}
-          />
-        </View>
+      <View style={styles.grid}>
+        <StatCard 
+          title={t('stats.weekly_workouts')} 
+          value={String(currentWeek.sessionCount)} 
+          icon={<BarChart3 size={20} color={Colors.neon.DEFAULT} />}
+        />
+        <StatCard 
+          title={t('stats.weekly_duration')} 
+          value={formatDuration(currentWeek.totalDuration, t)} 
+          icon={<Clock size={20} color={Colors.neon.DEFAULT} />}
+        />
+        <StatCard 
+          title={t('stats.weekly_volume')} 
+          value={formatVolume(currentWeek.totalVolume, t)} 
+          icon={<Weight size={20} color={Colors.neon.DEFAULT} />}
+        />
+        <StatCard 
+          title={t('stats.progression')} 
+          value={`${progressionPercent >= 0 ? "+" : ""}${progressionPercent.toFixed(1)}%`} 
+          trend={t('stats.vs_last_week')}
+          trendType={progressionTrendType}
+          icon={<TrendingUp size={20} color={Colors.neon.DEFAULT} />}
+        />
+      </View>
 
-        <View style={styles.sectionHeader}>
-          <View style={styles.titleWithIcon}>
-            <Target size={20} color={Colors.neon.DEFAULT} />
-            <Text style={styles.sectionTitle}>{t('stats.goals')}</Text>
-          </View>
-          <Button variant="ghost" size="sm" style={styles.addBtn}>
-            <Plus size={16} color={Colors.neon.DEFAULT} />
-            <Text style={styles.addBtnText}>{t('stats.new_goal')}</Text>
-          </Button>
+      <View style={styles.sectionHeader}>
+        <View style={styles.titleWithIcon}>
+          <Target size={20} color={Colors.neon.DEFAULT} />
+          <Text style={styles.sectionTitle}>{t('stats.goals')}</Text>
         </View>
+        <Button variant="ghost" size="sm" style={styles.addBtn}>
+          <Plus size={16} color={Colors.neon.DEFAULT} />
+          <Text style={styles.addBtnText}>{t('stats.new_goal')}</Text>
+        </Button>
+      </View>
 
-        {goals.length === 0 ? (
-          <Card style={styles.goalCard} glass={true}>
-            <CardContent style={styles.goalContent}>
-              <Text style={styles.emptyGoalsText}>{t('stats.no_active_goals')}</Text>
-            </CardContent>
-          </Card>
-        ) : (
-          goals.map((goal) => {
-            const percentage = goal.target_value > 0 
-              ? Math.min(100, Math.round((goal.current_value / goal.target_value) * 100))
-              : 0;
-            
-            return (
-              <Card key={goal.id} style={styles.goalCard} glass={true}>
-                <CardContent style={styles.goalContent}>
-                  <View style={styles.goalTop}>
-                    <Text style={styles.goalTitle}>{goal.title}</Text>
-                    <Text style={styles.goalPercentage}>{percentage}%</Text>
-                  </View>
-                  <View style={styles.goalMeta}>
-                    <Text style={styles.goalProgressText}>
-                      {goal.current_value} <Text style={styles.goalUnit}>/ {goal.target_value} {goal.unit}</Text>
-                    </Text>
-                  </View>
-                  <View style={styles.progressTrack}>
-                    <View style={[styles.progressBar, { width: `${percentage}%` }]} />
-                  </View>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </ScrollView>
-    </SafeAreaView>
+      {goals.length === 0 ? (
+        <Card style={styles.goalCard} glass={true}>
+          <CardContent style={styles.goalContent}>
+            <Text style={styles.emptyGoalsText}>{t('stats.no_active_goals')}</Text>
+          </CardContent>
+        </Card>
+      ) : (
+        goals.map((goal) => {
+          const percentage = goal.target_value > 0 
+            ? Math.min(100, Math.round((goal.current_value / goal.target_value) * 100))
+            : 0;
+          
+          return (
+            <Card key={goal.id} style={styles.goalCard} glass={true}>
+              <CardContent style={styles.goalContent}>
+                <View style={styles.goalTop}>
+                  <Text style={styles.goalTitle}>{goal.title}</Text>
+                  <Text style={styles.goalPercentage}>{percentage}%</Text>
+                </View>
+                <View style={styles.goalMeta}>
+                  <Text style={styles.goalProgressText}>
+                    {goal.current_value} <Text style={styles.goalUnit}>/ {goal.target_value} {goal.unit}</Text>
+                  </Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressBar, { width: `${percentage}%` }]} />
+                </View>
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    paddingHorizontal: Spacing.horizontal,
-    paddingVertical: 16,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: Colors.text.primary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -228,6 +195,7 @@ const styles = StyleSheet.create({
   statCard: {
     width: "48%",
     minHeight: 140,
+    marginBottom: 12,
   },
   statContent: {
     padding: 16,

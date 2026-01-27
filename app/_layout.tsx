@@ -62,17 +62,25 @@ function RootLayoutNav() {
           animation: "slide_from_bottom"
         }} 
       />
+      <Stack.Screen 
+        name="create-workout" 
+        options={{ 
+          headerShown: false,
+          presentation: "modal", // Standard iOS modal behavior
+        }} 
+      />
     </Stack>
   );
 }
 
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createSQLitePersister } from '@/lib/db/queryPersister';
 import { ActiveSessionProvider } from '@/context/ActiveSessionContext';
+import { HeartRateProvider } from '@/context/HeartRateContext';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
 import { startSyncMonitor } from '@/lib/offlineSync';
+import { registerBackgroundSync } from '@/lib/backgroundTasks';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,32 +96,34 @@ const queryClient = new QueryClient({
   },
 });
 
-const asyncStoragePersister = createAsyncStoragePersister({
-  storage: AsyncStorage,
+const sqlitePersister = createSQLitePersister({
   throttleTime: 3000, // Throttle saves to once every 3 seconds
 });
 
 export default function Layout() {
   // Start background sync monitor when app launches
   useEffect(() => {
-    const stopMonitor = startSyncMonitor(30000); // Sync every 30 seconds
+    const stopMonitor = startSyncMonitor(30000); // Sync every 30 seconds (Foreground)
+    registerBackgroundSync(); // Register background fetch
     return () => stopMonitor();
   }, []);
 
   return (
     <PersistQueryClientProvider 
       client={queryClient} 
-      persistOptions={{ persister: asyncStoragePersister }}
+      persistOptions={{ persister: sqlitePersister }}
     >
       <AuthProvider>
         <ActiveSessionProvider>
-          <SafeAreaProvider>
-            <View style={styles.container}>
-              <StatusBar style="light" />
-              <OfflineIndicator />
-              <RootLayoutNav />
-            </View>
-          </SafeAreaProvider>
+          <HeartRateProvider>
+            <SafeAreaProvider>
+              <View style={styles.container}>
+                <StatusBar style="light" />
+                <OfflineIndicator />
+                <RootLayoutNav />
+              </View>
+            </SafeAreaProvider>
+          </HeartRateProvider>
         </ActiveSessionProvider>
       </AuthProvider>
     </PersistQueryClientProvider>

@@ -13,7 +13,20 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.antti.sportvault",
+      "entitlements": {
+        "com.apple.developer.healthkit": true
+      },
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Sovellus tarvitsee luvan lukea syketietoja HealthKitistä treenin aikana.",
+        "NSHealthUpdateUsageDescription": "Sovellus tallentaa treenitiedot (kesto, syke, kalorit) HealthKitiin.",
+        "NSBluetoothAlwaysUsageDescription": "Sovellus käyttää Bluetoothia yhdistääkseen ulkoisiin sykevöihin.",
+        "NSBluetoothPeripheralUsageDescription": "Sovellus käyttää Bluetoothia yhdistääkseen ulkoisiin sykevöihin.",
+        "UIBackgroundModes": [
+          "bluetooth-central"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,14 +34,39 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "scheme": "sportvault",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": [
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Allow SportVault to connect to heart rate monitors."
+        }
+      ],
+      [
+        "expo-background-fetch",
+        {
+          "minimumInterval": 900,
+          "stopOnTerminate": false,
+          "startOnBoot": true
+        }
+      ]
     ]
   }
 }

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator, Alert, InteractionManager, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { useWorkoutTemplate } from '@/hooks/useWorkoutTemplate';
 import { Colors } from '@/constants/Colors';
 import { useActiveSession } from '@/context/ActiveSessionContext';
 import { useWorkoutTimer } from '@/hooks/useWorkoutTimer';
@@ -14,16 +15,19 @@ import { ActiveExerciseCard } from '@/components/workout/session/ActiveExerciseC
 import { RPESlider } from '@/components/workout/session/RPESlider';
 import { RestTimerDisplay } from '@/components/workout/session/RestTimerDisplay';
 import { WorkoutNotes } from '@/components/workout/session/WorkoutNotes';
+import { LiveHeartRate } from '@/components/workout/LiveHeartRate';
 import { useQueryClient } from "@tanstack/react-query";
 import { ExerciseReorderModal } from '@/components/workout/session/ExerciseReorderModal';
 import { WarmupPhase, type WarmupPhaseData } from '@/components/workout/WarmupPhase';
 import { WorkoutProgressBar } from '@/components/workout/session/WorkoutProgressBar';
+import { SessionSummary } from '@/features/workouts/SessionSummary';
 import type { WorkoutExercise } from '@/types';
 import { Database } from '@/types/supabase';
 import { isOnline, addToQueue } from '@/lib/offlineSync';
 import { workoutHistoryKeys } from '@/hooks/useWorkoutHistory';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import Animated, { FadeIn, SlideInUp } from 'react-native-reanimated';
 
 type Exercise = Database["public"]["Tables"]["exercises"]["Row"];
 type ExerciseSet = Database["public"]["Tables"]["exercise_sets"]["Row"];
@@ -32,7 +36,7 @@ interface ExerciseWithSets extends Exercise {
   exercise_sets: ExerciseSet[];
 }
 
-type SessionPhase = 'warmup' | 'workout' | 'cooldown' | 'complete';
+type SessionPhase = 'warmup' | 'workout' | 'cooldown' | 'complete' | 'summary';
 
 export default function WorkoutSessionScreen() {
   const { t } = useTranslation();
@@ -40,50 +44,50 @@ export default function WorkoutSessionScreen() {
   const router = useRouter();
   const { activeSession, startSession, endSession, isLoading } = useActiveSession();
   
-  const [loading, setLoading] = useState(true);
+  const { data: workoutTemplate, isLoading: isTemplateLoading, error: templateError } = useWorkoutTemplate(id);
+  // Do NOT wait for isLoading from activeSession to show loading spinner initially, 
+  // as activeSession loads async and we want to start quickly if possible.
+  // But we need to know if we are restoring.
+  const loading = isTemplateLoading;
+
   const [workoutName, setWorkoutName] = useState('');
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
   const [phase, setPhase] = useState<SessionPhase>('warmup');
   const [warmupData, setWarmupData] = useState<WarmupPhaseData | null>(null);
   const [cooldownData, setCooldownData] = useState<WarmupPhaseData | null>(null);
   const [notesVisible, setNotesVisible] = useState(false);
+  
+  // New state to hold the saved session ID for summary view
+  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
+
+  const justStarted = React.useRef(false);
+
+  /* Ref to prevent session resurrection when exiting */
+  const isExiting = React.useRef(false);
 
   useEffect(() => {
-    if (id && !isLoading) {
-      loadWorkout();
+    if (templateError) {
+      console.error("Error loading workout:", templateError);
+      Alert.alert(t('profile.error'), t('session.alerts.load_error'));
+      router.back();
     }
-  }, [id, isLoading]);
+  }, [templateError]);
 
   // If resuming an active session, skip directly to workout phase
   useEffect(() => {
     if (!isLoading && activeSession && activeSession.workoutId === id && phase === 'warmup') {
+      if (justStarted.current) {
+        justStarted.current = false;
+        return;
+      }
       console.log('Resuming active session, skipping warmup');
       setPhase('workout');
     }
   }, [isLoading, activeSession, id, phase]);
 
-  const loadWorkout = async () => {
-    try {
-      setLoading(true);
-      
-      const { data: workoutData, error: workoutError } = await supabase
-        .from("workouts")
-        .select("*")
-        .eq("id", id)
-        .single();
-      
-      if (workoutError) throw workoutError;
-      setWorkoutName(workoutData.program);
-
-      const { data: exerciseData, error: exerciseError } = await supabase
-        .from("exercises")
-        .select(`*, exercise_sets (*)`)
-        .eq("workout_id", id)
-        .order("created_at", { ascending: true });
-
-      if (exerciseError) throw exerciseError;
-
-      const transformedExercises: WorkoutExercise[] = (exerciseData as ExerciseWithSets[]).map(ex => ({
+  useEffect(() => {
+    if (workoutTemplate) {
+      const transformedExercises: WorkoutExercise[] = workoutTemplate.exercises.map(ex => ({
         id: ex.id,
         name: ex.name,
         category: ex.category,
@@ -99,21 +103,21 @@ export default function WorkoutSessionScreen() {
         })),
       }));
 
+      setWorkoutName(workoutTemplate.program);
       setExercises(transformedExercises);
-
-      if (!activeSession || activeSession.workoutId !== id) {
-        startSession(id!, workoutData.program, transformedExercises);
+      
+      // Only start if not exiting and no active session
+      if (!activeSession && !isExiting.current && !isLoading) {
+          // Defer startSession to avoid blocking the modal transition and causing background flashes
+          InteractionManager.runAfterInteractions(() => {
+            if (!isExiting.current) {
+              startSession(id!, workoutTemplate.program, transformedExercises);
+              justStarted.current = true;
+            }
+          });
       }
-
-    } catch (error) {
-      console.error("Error loading workout:", error);
-      Alert.alert(t('profile.error'), t('session.alerts.load_error'));
-      endSession();
-      router.back();
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [workoutTemplate, activeSession, id, isLoading]);
 
   const handleWarmupComplete = (data: WarmupPhaseData) => {
     setWarmupData(data);
@@ -135,23 +139,17 @@ export default function WorkoutSessionScreen() {
     setPhase('complete');
   };
 
-  const handleClose = () => {
-    Alert.alert(
-      t('session.alerts.finish_title'),
-      t('session.alerts.finish_message'),
-      [
-        { text: t('session.alerts.cancel'), style: "cancel" },
-        { text: t('session.alerts.save_and_finish'), onPress: () => endSession() },
-        { text: t('session.alerts.discard'), style: "destructive", onPress: () => { endSession(); router.back(); } },
-      ]
-    );
+  
+  const handleSessionSaved = (sessionId: string | null) => {
+    if (sessionId) {
+      setSavedSessionId(sessionId);
+      setPhase('summary');
+    } else {
+      // If save failed or returned null (e.g. error), exit
+      router.back();
+    }
   };
 
-  // Handle 'complete' phase (after cooldown) - need to pass to content component
-  const handleSaveSession = async () => {
-    // This will be called from WorkoutSessionContent after cooldown phase
-    // The actual save is handled inside WorkoutSessionContent
-  };
 
   if (loading || isLoading || exercises.length === 0) {
     return (
@@ -161,55 +159,108 @@ export default function WorkoutSessionScreen() {
     );
   }
 
-  // Show warmup phase
-  if (phase === 'warmup') {
+
+
+  // Show summary phase
+  if (phase === 'summary' && savedSessionId) {
     return (
-      <WarmupPhase
-        type="warmup"
-        visible={true}
-        onComplete={handleWarmupComplete}
-        onSkip={handleWarmupSkip}
-      />
+      <Animated.View style={{ flex: 1 }} entering={FadeIn.duration(400)}>
+        <SessionSummary 
+            sessionId={savedSessionId} 
+            onClose={() => {
+            // Dismiss the modal completely
+            if (router.canDismiss()) {
+                router.dismiss();
+            } else {
+                router.back();
+            }
+            }} 
+        />
+      </Animated.View>
     );
   }
 
-  // Show cooldown phase
-  if (phase === 'cooldown') {
-    return (
-      <WarmupPhase
-        type="cooldown"
-        visible={true}
-        onComplete={handleCooldownComplete}
-        onSkip={handleCooldownSkip}
-      />
-    );
-  }
+  const showContent = phase === 'workout' || phase === 'cooldown' || phase === 'complete';
 
-  // If phase is 'complete', WorkoutSessionContent will auto-save
   return (
-    <WorkoutSessionContent
-      exercises={activeSession?.exercises || exercises}
-      initialState={activeSession?.workoutId === id ? {
-        setResults: activeSession.setResults,
-        currentExerciseIndex: activeSession.currentExerciseIndex,
-        currentSetIndex: activeSession.currentSetIndex,
-        orderedExercises: activeSession.exercises,
-        exerciseNotes: activeSession.exerciseNotes,
-      } : undefined}
-      workoutName={workoutName}
-      workoutId={id!}
-      onClose={handleClose}
-      warmupData={warmupData}
-      cooldownData={cooldownData}
-      onRequestCooldown={() => setPhase('cooldown')}
-      shouldAutoSave={phase === 'complete'}
-      notesVisible={notesVisible}
-      onToggleNotes={() => setNotesVisible(!notesVisible)}
-    />
+    <View style={styles.container}>
+      {/* Warmup Phase - Standard render (not overlay, as session hasn't started visualy) */}
+      {phase === 'warmup' && (
+        <WarmupPhase
+          type="warmup"
+          visible={true}
+          onComplete={handleWarmupComplete}
+          onSkip={handleWarmupSkip}
+        />
+      )}
+
+      {/* Main Session Content - Kept mounted during cooldown/complete */}
+      {showContent && (
+        <WorkoutSessionContent
+          exercises={activeSession?.exercises || exercises}
+          initialState={activeSession?.workoutId === id ? {
+            setResults: activeSession.setResults,
+            currentExerciseIndex: activeSession.currentExerciseIndex,
+            currentSetIndex: activeSession.currentSetIndex,
+            orderedExercises: activeSession.exercises,
+            exerciseNotes: activeSession.exerciseNotes,
+          } : undefined}
+          workoutName={workoutName}
+          workoutId={id!}
+          onExit={() => { isExiting.current = true; }}
+          warmupData={warmupData}
+          cooldownData={cooldownData}
+          onRequestCooldown={() => setPhase('cooldown')}
+          shouldAutoSave={phase === 'complete'}
+          notesVisible={notesVisible}
+          onToggleNotes={() => setNotesVisible(!notesVisible)}
+          onSessionSaved={handleSessionSaved}
+        />
+      )}
+
+      {/* Cooldown Overlay */}
+      {phase === 'cooldown' && (
+        <Animated.View 
+            style={[StyleSheet.absoluteFill, { zIndex: 2000 }]} 
+            entering={SlideInUp.duration(400)}
+        >
+          <WarmupPhase
+            type="cooldown"
+            visible={true} // prop ignored by overlay=true logic usually, but kept for type
+            overlay={true}
+            onComplete={handleCooldownComplete}
+            onSkip={handleCooldownSkip}
+          />
+        </Animated.View>
+      )}
+
+      {/* Saving Overlay */}
+      {phase === 'complete' && (
+        <Animated.View 
+            style={styles.loadingOverlay}
+            entering={FadeIn.duration(300)}
+        >
+          <ActivityIndicator color={Colors.neon.DEFAULT} size="large" />
+          <Text style={styles.loadingText}>{t('session.saving') || 'Saving...'}</Text>
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
 import { Audio } from 'expo-av';
+import * as Notifications from 'expo-notifications';
+import { useHeartRate } from '@/context/HeartRateContext';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: false,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+    shouldShowBanner: false,
+    shouldShowList: false,
+  }),
+});
 
 const completeSound = require('../../assets/sounds/wooden_mallet.mp3');
 
@@ -217,7 +268,7 @@ function WorkoutSessionContent({
   exercises,
   workoutName,
   workoutId,
-  onClose,
+  onExit,
   warmupData,
   cooldownData,
   onRequestCooldown,
@@ -225,10 +276,11 @@ function WorkoutSessionContent({
   notesVisible,
   onToggleNotes,
   initialState,
+  onSessionSaved
 }: {
   exercises: WorkoutExercise[];
   initialState?: {
-    setResults: unknown[][]; // typed as SetResult[][] but unknown here to avoid import
+    setResults: unknown[][]; 
     currentExerciseIndex: number;
     currentSetIndex: number;
     orderedExercises: WorkoutExercise[];
@@ -236,19 +288,22 @@ function WorkoutSessionContent({
   };
   workoutName: string;
   workoutId: string;
-  onClose: () => void;
+  onExit: () => void;
   warmupData: WarmupPhaseData | null;
   cooldownData: WarmupPhaseData | null;
   onRequestCooldown: () => void;
   shouldAutoSave: boolean;
   notesVisible: boolean;
   onToggleNotes: () => void;
+  onSessionSaved: (sessionId: string | null) => void;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { endSession, updateSession } = useActiveSession();
+  const { activeSession, endSession, updateSession } = useActiveSession();
+  const { currentBpm } = useHeartRate();
+  const [liveActivityId, setLiveActivityId] = useState<string | null>(null);
 
   const playCompleteSound = async () => {
     try {
@@ -264,12 +319,89 @@ function WorkoutSessionContent({
     }
   };
 
+  useEffect(() => {
+    async function initLiveActivity() {
+       // Live Activity Removed
+    }
+
+    async function requestPermissions() {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Notification permissions not granted');
+      }
+    }
+    
+    requestPermissions();
+    initLiveActivity();
+
+    return () => {
+      // Note: We don't end it here because the hook might unmount but session continues in context
+      // End happens in endSession or handleSaveAndEnd
+    };
+  }, []);
+
+
+
+  const handleRestTimerChange = async (target: number | null, duration: number | null) => {
+    // Update session state
+    updateSession({ 
+      restTimerTarget: target,
+      restTimerDuration: duration,
+    });
+
+    // Update Live Activity REMOVED
+
+    // Handle notifications
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    
+    if (target && target > Date.now()) {
+      const seconds = (target - Date.now()) / 1000;
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: t('session.alerts.rest_complete') || "Rest Complete!",
+          body: t('session.alerts.rest_complete_body') || "Time to crush the next set!",
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: seconds,
+          repeats: false,
+        },
+      });
+    }
+  };
+
   const workoutTimer = useWorkoutTimer({
     initialRestTime: exercises[0]?.sets[0]?.restTime || 120,
-    onRestComplete: () => {
+    onRestComplete: (msSinceCompletion) => {
+      // If completed more than 500ms ago, assume notification handled it or meaningful time passed
+      if (typeof msSinceCompletion === 'number' && msSinceCompletion > 500) {
+        console.log('Rest timer finished in background (late by ' + msSinceCompletion + 'ms), suppressing in-app sound.');
+        return;
+      }
       playCompleteSound();
     },
+    sessionStartTime: activeSession?.startTime,
+    restTimerTarget: activeSession?.restTimerTarget,
+    restTimerDuration: activeSession?.restTimerDuration,
+    onRestTimerChange: handleRestTimerChange,
   });
+
+  const handleClose = () => {
+    Alert.alert(
+      t('session.alerts.finish_title'),
+      t('session.alerts.finish_message'),
+      [
+        { text: t('session.alerts.cancel'), style: "cancel" },
+        { text: t('session.alerts.save_and_finish'), onPress: () => handleSaveAndEnd(true) },
+        { text: t('session.alerts.discard'), style: "destructive", onPress: () => { 
+          onExit();
+          endSession(); 
+          router.back(); 
+        } },
+      ]
+    );
+  };
 
   const workoutState = useWorkoutState({ 
     exercises,
@@ -299,7 +431,8 @@ function WorkoutSessionContent({
     workoutState.currentExerciseIndex, 
     workoutState.currentSetIndex,
     workoutState.orderedExercises,
-    updateSession
+    updateSession,
+    workoutState.currentExercise?.name,
   ]);
 
   // Auto-save when cooldown is complete
@@ -314,16 +447,27 @@ function WorkoutSessionContent({
     if (save) {
       sessionId = await saveSession();
     }
+    
+    // End Live Activity REMOVED
+    
+    // Mark as exiting logic handled by parent via onExit if needed, 
+    // but here we just need to ensure we don't start a new one.
+    onExit();
+    
+    // Clear active session
     endSession();
-    if (sessionId) {
-      await queryClient.invalidateQueries({ queryKey: ['workout_details', workoutId] });
-      await queryClient.invalidateQueries({ queryKey: ['workouts'] });
-      await queryClient.invalidateQueries({ queryKey: workoutHistoryKeys.all });
-      router.replace(`/(dashboard)/workouts/session/${sessionId}`);
+    
+    // Invalidate queries in any case
+    await queryClient.invalidateQueries({ queryKey: ['workout_details', workoutId] });
+    await queryClient.invalidateQueries({ queryKey: ['workouts'] });
+    await queryClient.invalidateQueries({ queryKey: workoutHistoryKeys.all });
+
+    if (save && sessionId) {
+       // Call callback to show summary in parent
+       onSessionSaved(sessionId);
     } else {
-      await queryClient.invalidateQueries({ queryKey: ['workout_details', workoutId] });
-      await queryClient.invalidateQueries({ queryKey: ['workouts'] });
-      router.back();
+       // Exit if not saving or save failed (and we didn't return early)
+       router.back();
     }
   };
 
@@ -586,9 +730,13 @@ function WorkoutSessionContent({
       <WorkoutHeader
         formattedTime={workoutTimer.formattedWorkoutTime}
         workoutName={workoutName}
-        onClose={onClose}
+        onClose={handleClose}
         onOpenMenu={() => setReorderModalVisible(true)}
       />
+      
+      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+        <LiveHeartRate />
+      </View>
       
       <WorkoutProgressBar
         sessionExercises={exercises}
@@ -672,6 +820,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    gap: 16,
+  },
+  loadingText: {
+    color: Colors.text.primary,
+    fontSize: 16,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,

@@ -11,7 +11,7 @@ import {
   Platform,
   Alert
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -162,6 +162,7 @@ export default function WorkoutDetailsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
@@ -262,7 +263,7 @@ export default function WorkoutDetailsScreen() {
           <View style={styles.footerDivider} />
           <Pressable 
             style={styles.footerBtn}
-            onPress={() => router.push({ pathname: "/(dashboard)/workouts/create", params: { id } })}
+            onPress={() => router.push({ pathname: "/create-workout", params: { id } })}
           >
             <Edit3 color={Colors.text.secondary} size={18} />
             <Text style={styles.footerBtnText}>{t('workouts.details.edit')}</Text>
@@ -292,6 +293,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+    paddingTop: 40, // Add padding for status bar since global header is hidden
   },
   loadingContainer: {
     flex: 1,

@@ -24,7 +24,6 @@ import {
   getWorkoutEmoji,
   getCompletionColor,
 } from "@/hooks/useWorkoutHistory";
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
 
 // ----- Session Card Component -----
 interface SessionCardProps {
@@ -150,7 +149,7 @@ export default function HistoryScreen() {
 
   const handleSessionPress = useCallback(
     (sessionId: string) => {
-      router.push(`/(dashboard)/workouts/session/${sessionId}`);
+      router.push(`/(dashboard)/history/session/${sessionId}`);
     },
     [router]
   );
@@ -176,11 +175,10 @@ export default function HistoryScreen() {
     return <EmptyState />;
   }, [isLoading]);
 
-  const renderSeparator = useCallback(() => <View style={{ height: 12 }} />, []);
+  const renderSeparator = useCallback(() => <View style={{ height: 8 }} />, []);
 
   return (
     <View style={styles.container}>
-      <DashboardHeader />
       <View style={{ flex: 1, paddingHorizontal: Spacing.horizontal }}>
         <FlashList
           data={sessions}

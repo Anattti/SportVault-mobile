@@ -37,4 +37,7 @@ export interface ActiveSession {
   setResults: SetResult[][];
   exercises: WorkoutExercise[];
   exerciseNotes: Record<number, string>;
+  restTimerTarget: number | null; // Timestamp when rest timer should end
+  restTimerDuration: number | null; // Total duration of the current rest timer (for progress bar)
+  activityId?: string | null; // Live Activity ID for iOS
 }

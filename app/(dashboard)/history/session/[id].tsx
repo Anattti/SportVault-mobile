@@ -1,5 +1,5 @@
 import { SessionSummary } from "@/features/workouts/SessionSummary";
 
-export default function SessionSummaryScreen() {
+export default function HistorySessionScreen() {
   return <SessionSummary />;
 }

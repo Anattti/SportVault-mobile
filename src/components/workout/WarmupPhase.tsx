@@ -25,6 +25,7 @@ export interface WarmupPhaseData {
   intensity: WarmupIntensity;
   notes: string;
   skipped: boolean;
+  exercises?: any[]; // WarmupCooldownExercise[] - avoiding circular dependency if possible, or use any for now
 }
 
 interface WarmupPhaseProps {
@@ -32,9 +33,10 @@ interface WarmupPhaseProps {
   visible: boolean;
   onComplete: (data: WarmupPhaseData) => void;
   onSkip: () => void;
+  overlay?: boolean;
 }
 
-export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhaseProps) {
+export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false }: WarmupPhaseProps) {
   const { t } = useTranslation();
 
   const METHODS: { id: WarmupMethod; label: string }[] = useMemo(() => [
@@ -98,13 +100,8 @@ export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhasePr
   const circumference = 2 * Math.PI * 110;
   const strokeDashoffset = circumference * (1 - progress);
 
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="fullScreen"
-    >
-      <View style={styles.container}>
+  const content = (
+      <View style={[styles.container, overlay && styles.overlayContainer]}>
         {/* Title */}
         <Text style={styles.title}>{title}</Text>
 
@@ -226,6 +223,17 @@ export function WarmupPhase({ type, visible, onComplete, onSkip }: WarmupPhasePr
           </Pressable>
         </View>
       </View>
+  );
+
+  if (overlay) return content;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+    >
+      {content}
     </Modal>
   );
 }
@@ -236,6 +244,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     paddingHorizontal: 24,
     paddingTop: 60,
+  },
+  overlayContainer: {
+    paddingTop: 60, // Ensure same padding
+    backgroundColor: Colors.background, // Ensure logic covers
+    zIndex: 100, // Ensure on top
   },
   title: {
     fontSize: 20,

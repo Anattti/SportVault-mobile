@@ -9,6 +9,7 @@ import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
 import { WifiOff, CloudOff, RefreshCw } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { useNetworkStatus, getQueueSize, processQueue } from '@/lib/offlineSync';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface OfflineIndicatorProps {
   showPendingCount?: boolean;
@@ -16,10 +17,11 @@ interface OfflineIndicatorProps {
 
 export function OfflineIndicator({ showPendingCount = true }: OfflineIndicatorProps) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-  const slideAnim = useState(() => new Animated.Value(-60))[0];
+  const slideAnim = useState(() => new Animated.Value(-100))[0];
 
   const isOffline = !isConnected || isInternetReachable === false;
 
@@ -38,7 +40,7 @@ export function OfflineIndicator({ showPendingCount = true }: OfflineIndicatorPr
   useEffect(() => {
     // Animate slide in/out
     Animated.spring(slideAnim, {
-      toValue: isOffline || pendingCount > 0 ? 0 : -60,
+      toValue: isOffline || pendingCount > 0 ? 0 : -100,
       useNativeDriver: true,
       tension: 100,
       friction: 10,
@@ -67,6 +69,7 @@ export function OfflineIndicator({ showPendingCount = true }: OfflineIndicatorPr
     <Animated.View 
       style={[
         styles.container,
+        { top: insets.top + 6 }, // Position in header
         { transform: [{ translateY: slideAnim }] },
         isOffline ? styles.offlineContainer : styles.pendingContainer,
       ]}
@@ -112,31 +115,36 @@ export function OfflineIndicator({ showPendingCount = true }: OfflineIndicatorPr
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    right: 16, // Float right
     zIndex: 1000,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 50, // Account for status bar
+    borderRadius: 20, // Capsule shape
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   offlineContainer: {
-    backgroundColor: '#EF4444', // Red
+    backgroundColor: '#EF4444', 
   },
   pendingContainer: {
-    backgroundColor: '#F59E0B', // Amber
+    backgroundColor: '#F59E0B', 
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   text: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   syncButton: {

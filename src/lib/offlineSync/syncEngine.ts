@@ -208,6 +208,39 @@ async function syncSessionBatch(sessionId: string, items: SyncItem[]): Promise<b
   const exercises = items.filter(i => i.type === 'session_exercise').map(i => i.data);
   const sets = items.filter(i => i.type === 'session_set').map(i => i.data);
 
+  // 1.5 Conflict Detection (Client-Side)
+  try {
+    const { data: currentSession, error: fetchError } = await supabase
+      .from('workout_sessions')
+      .select('updated_at, id')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (!fetchError && currentSession) {
+      const localUpdatedAt = sessionItem.data.updated_at ? new Date(sessionItem.data.updated_at as string).getTime() : 0;
+      const serverUpdatedAt = currentSession.updated_at ? new Date(currentSession.updated_at).getTime() : 0;
+
+      // Tolerance of 1 second to avoid clock drift issues on same-device quick syncs
+      if (serverUpdatedAt > localUpdatedAt + 1000) {
+        console.warn(`[SyncEngine] Conflict detected for session ${sessionId}. Server: ${serverUpdatedAt}, Local: ${localUpdatedAt}. Aborting batch sync to protect server data.`);
+        // For now, we abort. In future, we could trigger valid conflict resolution UI or auto-merge.
+        // Returning false causes retry, which might loop if we don't handle it. 
+        // We should mark it as failed with specific error or move to a "conflict queue".
+        // For this phase, logging and "Last Writer Wins" (if we proceeded) is the norm, but we choose to PROTECT server data.
+        
+        // However, if we abort and return false, it will retry forever.
+        // Let's Log strict warning but PROCEED for now as per plan "Log warning but let user change win" 
+        // OR better: skip this item and mark as 'conflict_error' to stop retrying.
+        
+        // Actually, the plan said: "Log warning but let user change win (or force-flag)".
+        // But to be safe, let's just Log for now and proceed, effectively "Last Writer Wins" but with visibility.
+        console.warn('[SyncEngine] Proceeding with overwrite (Last Writer Wins strategy currently active).');
+      }
+    }
+  } catch (e) {
+    console.log('[SyncEngine] Failed to check for conflicts, proceeding anyway.', e);
+  }
+
   const payload = {
     session: sessionItem.data,
     exercises: exercises,

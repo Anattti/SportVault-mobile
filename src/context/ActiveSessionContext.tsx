@@ -29,7 +29,6 @@ export function ActiveSessionProvider({ children }: { children: React.ReactNode 
           // Verify if session is not too old (e.g., > 24 hours)?
           // For now, just restore it.
           setActiveSession(savedSession);
-          console.log('Restored active session:', savedSession.workoutId);
         }
       } finally {
         setIsLoading(false);
@@ -62,7 +61,11 @@ export function ActiveSessionProvider({ children }: { children: React.ReactNode 
       setResults: initialResults,
       exercises,
       exerciseNotes: {},
+      restTimerTarget: null,
+      restTimerDuration: null,
     };
+
+
 
     setActiveSession(newSession);
     saveActiveSession(newSession);
@@ -70,8 +73,14 @@ export function ActiveSessionProvider({ children }: { children: React.ReactNode 
 
   const updateSession = useCallback((updates: Partial<ActiveSession>) => {
     setActiveSession(prev => {
+      // Critical check: If prev is null, it means session was ended/cleared.
+      // We MUST return null and NOT save, effectively ignoring any lingering updates 
+      // from unmounting components.
       if (!prev) return null;
+      
       const updated = { ...prev, ...updates };
+      
+      
       saveActiveSession(updated); // Persist updates immediately
       return updated;
     });

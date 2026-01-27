@@ -20,7 +20,6 @@ import DraggableFlatList, {
 } from "react-native-draggable-flatlist";
 
 import * as Haptics from "expo-haptics";
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
 
 
 type Workout = Database["public"]["Tables"]["workouts"]["Row"] & {
@@ -164,7 +163,6 @@ export default function WorkoutsScreen() {
 
   return (
     <View style={styles.container}>
-      <DashboardHeader />
       <DraggableFlatList
         data={workouts}
         renderItem={renderItem}
@@ -184,7 +182,7 @@ export default function WorkoutsScreen() {
               <Button 
                 variant="outline" 
                 style={styles.emptyButton}
-                onPress={() => router.push("/(dashboard)/workouts/create")}
+                onPress={() => router.push("/create-workout")}
               >
                 <Text style={styles.emptyButtonText}>{t('workouts.create_first')}</Text>
               </Button>

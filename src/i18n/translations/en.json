@@ -222,7 +222,13 @@
     "vs_last_week": "vs. last week",
     "goals": "Goals",
     "new_goal": "New goal",
-    "no_active_goals": "No active goals"
+    "no_active_goals": "No active goals",
+    "weekly_overview": "Weekly Overview",
+    "workouts": "Workouts",
+    "duration": "Duration",
+    "total_volume": "Total Volume",
+    "active_goals": "Active Goals",
+    "no_goals": "No goals"
   },
   "session": {
     "header": {
@@ -267,7 +273,9 @@
       "offline_saved_title": "Saved Locally",
       "offline_saved_message": "Workout will be saved to Supabase when network is restored.",
       "save_error": "Failed to save workout. Please check your connection.",
-      "load_error": "Failed to load workout"
+      "load_error": "Failed to load workout",
+      "rest_complete": "Rest Complete!",
+      "rest_complete_body": "Time to crush the next set! 💪"
     },
     "exercise_card": {
       "set_num": "Set {{num}}",

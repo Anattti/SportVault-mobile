@@ -13,6 +13,104 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { ActiveSessionBanner } from "@/components/workout/ActiveSessionBanner";
 import { LiquidTabs, TabItem } from "@/components/ui/LiquidTabs";
+import { useHeartRate } from "@/context/HeartRateContext";
+import { Heart } from "lucide-react-native";
+import Animated, { 
+  useAnimatedStyle, 
+  withSpring, 
+  withTiming, 
+  useSharedValue, 
+  withSequence, 
+  withRepeat, 
+  Easing 
+} from "react-native-reanimated";
+import { useState, useEffect } from "react";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function EasterEggBolt() {
+  const { currentBpm, status } = useHeartRate();
+  const [showHeart, setShowHeart] = useState(false);
+  
+  // Animations
+  const scaleHeart = useSharedValue(0);
+  const scaleBolt = useSharedValue(1);
+  const heartBeat = useSharedValue(1);
+
+  const toggle = () => {
+    const nextState = !showHeart;
+    setShowHeart(nextState);
+
+    if (nextState) {
+        // Show Heart
+        scaleBolt.value = withTiming(0, { duration: 300 });
+        scaleHeart.value = withSpring(1, { damping: 42 });
+    } else {
+        // Show Bolt
+        scaleHeart.value = withTiming(0, { duration: 300 });
+        scaleBolt.value = withSpring(1, { damping: 42 });
+    }
+  };
+
+  // Heartbeat animation
+  useEffect(() => {
+    if (showHeart && status === 'connected') {
+        heartBeat.value = withRepeat(
+            withSequence(
+                withTiming(1.2, { duration: 100, easing: Easing.ease }),
+                withTiming(1, { duration: 500, easing: Easing.ease })
+            ),
+            -1,
+            true
+        );
+    } else {
+        heartBeat.value = withTiming(1);
+    }
+  }, [showHeart, status, currentBpm]); // Pulse faster with high BPM? For now constant beat.
+
+  const boltStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scaleBolt.value }],
+    opacity: scaleBolt.value,
+    position: 'absolute',
+    left: -2
+  }));
+
+  const heartStyle = useAnimatedStyle(() => ({
+    transform: [
+        { scale: scaleHeart.value },
+        { scale: heartBeat.value }
+    ],
+    opacity: scaleHeart.value,
+    position: 'absolute',
+    left: 2, // Added padding/spacing (was -4)
+    alignItems: 'center',
+    justifyContent: 'center',
+  }));
+
+  const displayText = status === 'connected' && currentBpm ? currentBpm : (status === 'connected' ? '--' : 'X');
+  const fillColor = status === 'connected' ? Colors.status.destructive : '#333';
+
+  return (
+    <Pressable onPress={toggle} style={{ width: 24, height: 24, justifyContent: 'center' }}>
+      <Animated.View style={boltStyle}>
+        <BoltLogo size={24} />
+      </Animated.View>
+      
+      <Animated.View style={heartStyle}>
+        <Heart size={28} color={fillColor} fill={fillColor} />
+        <Text style={{ 
+            position: 'absolute', 
+            color: 'white', 
+            fontSize: 10, 
+            fontWeight: 'bold',
+            textAlign: 'center'
+        }}>
+            {displayText}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export function DashboardHeader() {
   const { t } = useTranslation();
@@ -25,14 +123,15 @@ export function DashboardHeader() {
     { id: 'calendar', label: t('nav.calendar'), icon: Calendar },
     { id: 'calculator', label: t('nav.calculator'), icon: Calculator },
   ], [t]);
+
   const pathname = usePathname();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Determine active tab based on pathname
   const getActiveTab = () => {
-    if (pathname.includes('/workouts/history')) return 'history';
-    if (pathname.includes('/workouts') && !pathname.includes('/workouts/history')) return 'workouts';
+    if (pathname.includes('/history')) return 'history';
+    if (pathname.includes('/workouts')) return 'workouts';
     if (pathname.includes('/analytics')) return 'analytics';
     if (pathname.includes('/calendar')) return 'calendar';
     if (pathname.includes('/calculator')) return 'calculator';
@@ -47,7 +146,7 @@ export function DashboardHeader() {
         router.push("/(dashboard)/workouts");
         break;
       case 'history':
-        router.push("/(dashboard)/workouts/history");
+        router.push("/(dashboard)/history");
         break;
       case 'analytics':
         router.push("/(dashboard)/analytics");
@@ -87,13 +186,13 @@ export function DashboardHeader() {
         <View style={styles.headerLeft}>
           <View style={styles.brandContainer}>
             <Text style={styles.brandText}>SportVault</Text>
-            <BoltLogo size={24} style={{ marginLeft: -2 }} />
+            <EasterEggBolt />
           </View>
         </View>
         <View style={styles.headerRight}>
           <Button 
             style={styles.addWorkoutButton}
-            onPress={() => router.push("/(dashboard)/workouts/create")}
+            onPress={() => router.push("/create-workout")}
           >
             <View style={styles.addWorkoutContent}>
               <Plus color="#000" size={20} />

@@ -1,13 +1,13 @@
 /**
- * Sync Queue
- * AsyncStorage-based queue for offline operations with atomic writes
+ * Sync Queue (SQLite Implementation)
+ * Persistent queue for offline operations using SQLite
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getDB } from '@/lib/db';
 
-const SYNC_QUEUE_KEY = '@sportvault_sync_queue';
-const SYNC_QUEUE_TEMP_KEY = '@sportvault_sync_queue_temp';
-const SYNC_LOCK_KEY = '@sportvault_sync_lock';
+// Re-defining types here to avoid circular dependency if we import from itself, 
+// or if we want to keep this file self-contained.
+// Actually, let's keep the types exported here as they were.
 
 export type SyncOperationType = 'insert' | 'update' | 'delete';
 export type SyncItemType = 'workout_session' | 'session_exercise' | 'session_set';
@@ -23,69 +23,41 @@ export interface SyncItem {
 }
 
 /**
- * Atomic write pattern - write to temp, then swap
- * Prevents data corruption on crashes
- */
-async function atomicWrite(data: SyncItem[]): Promise<void> {
-  const jsonData = JSON.stringify(data);
-  
-  // Write to temp key first
-  await AsyncStorage.setItem(SYNC_QUEUE_TEMP_KEY, jsonData);
-  
-  // Then atomically move to main key
-  await AsyncStorage.setItem(SYNC_QUEUE_KEY, jsonData);
-  
-  // Clean up temp
-  await AsyncStorage.removeItem(SYNC_QUEUE_TEMP_KEY);
-}
-
-/**
- * Recover from potential corruption
- */
-async function recoverQueue(): Promise<SyncItem[]> {
-  try {
-    // Try main queue first
-    const mainData = await AsyncStorage.getItem(SYNC_QUEUE_KEY);
-    if (mainData) {
-      return JSON.parse(mainData);
-    }
-
-    // Check temp queue as fallback
-    const tempData = await AsyncStorage.getItem(SYNC_QUEUE_TEMP_KEY);
-    if (tempData) {
-      const items = JSON.parse(tempData);
-      await atomicWrite(items); // Recover by completing the write
-      return items;
-    }
-
-    return [];
-  } catch (error) {
-    console.error('[SyncQueue] Recovery failed:', error);
-    return [];
-  }
-}
-
-/**
  * Get all items in the sync queue
  */
 export async function getQueue(): Promise<SyncItem[]> {
-  return recoverQueue();
+  const db = await getDB();
+  const results = await db.getAllAsync<any>('SELECT * FROM sync_queue ORDER BY timestamp ASC');
+  
+  return results.map(row => ({
+    id: row.id,
+    type: row.type as SyncItemType,
+    operation: row.operation as SyncOperationType,
+    data: JSON.parse(row.data),
+    timestamp: row.timestamp,
+    retryCount: row.retry_count,
+    lastError: row.last_error || undefined,
+  }));
 }
 
 /**
  * Add an item to the sync queue
  */
 export async function addToQueue(item: Omit<SyncItem, 'timestamp' | 'retryCount'>): Promise<void> {
-  const queue = await getQueue();
+  const db = await getDB();
+  const timestamp = Date.now();
   
-  const newItem: SyncItem = {
-    ...item,
-    timestamp: Date.now(),
-    retryCount: 0,
-  };
-
-  queue.push(newItem);
-  await atomicWrite(queue);
+  await db.runAsync(
+    `INSERT OR REPLACE INTO sync_queue (id, type, operation, data, timestamp, retry_count, last_error)
+     VALUES (?, ?, ?, ?, ?, 0, NULL)`,
+    [
+      item.id,
+      item.type,
+      item.operation,
+      JSON.stringify(item.data),
+      timestamp
+    ]
+  );
   
   console.log(`[SyncQueue] Added item: ${item.type}/${item.id}`);
 }
@@ -94,10 +66,8 @@ export async function addToQueue(item: Omit<SyncItem, 'timestamp' | 'retryCount'
  * Remove an item from the queue by ID
  */
 export async function removeFromQueue(id: string): Promise<void> {
-  const queue = await getQueue();
-  const filtered = queue.filter(item => item.id !== id);
-  await atomicWrite(filtered);
-  
+  const db = await getDB();
+  await db.runAsync('DELETE FROM sync_queue WHERE id = ?', [id]);
   console.log(`[SyncQueue] Removed item: ${id}`);
 }
 
@@ -105,26 +75,19 @@ export async function removeFromQueue(id: string): Promise<void> {
  * Update retry count for an item
  */
 export async function incrementRetryCount(id: string, error?: string): Promise<void> {
-  const queue = await getQueue();
-  const updated = queue.map(item => {
-    if (item.id === id) {
-      return {
-        ...item,
-        retryCount: item.retryCount + 1,
-        lastError: error,
-      };
-    }
-    return item;
-  });
-  await atomicWrite(updated);
+  const db = await getDB();
+  await db.runAsync(
+    'UPDATE sync_queue SET retry_count = retry_count + 1, last_error = ? WHERE id = ?',
+    [error || null, id]
+  );
 }
 
 /**
  * Clear the entire queue
  */
 export async function clearQueue(): Promise<void> {
-  await AsyncStorage.removeItem(SYNC_QUEUE_KEY);
-  await AsyncStorage.removeItem(SYNC_QUEUE_TEMP_KEY);
+  const db = await getDB();
+  await db.runAsync('DELETE FROM sync_queue');
   console.log('[SyncQueue] Queue cleared');
 }
 
@@ -132,25 +95,39 @@ export async function clearQueue(): Promise<void> {
  * Get queue size
  */
 export async function getQueueSize(): Promise<number> {
-  const queue = await getQueue();
-  return queue.length;
+  const db = await getDB();
+  const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM sync_queue');
+  return result?.count || 0;
 }
+
+// Sync Lock Implementation (using SQLite documents table)
+const SYNC_LOCK_KEY = 'sportvault_sync_lock';
 
 /**
  * Acquire sync lock (prevents multiple sync processes)
  */
 export async function acquireSyncLock(): Promise<boolean> {
-  const lock = await AsyncStorage.getItem(SYNC_LOCK_KEY);
+  const db = await getDB();
   
-  if (lock) {
+  // Check existing lock
+  const result = await db.getFirstAsync<{ created_at: number }>(
+    'SELECT created_at FROM documents WHERE key = ?',
+    [SYNC_LOCK_KEY]
+  );
+  
+  if (result) {
     // Check if lock is stale (older than 5 minutes)
-    const lockTime = parseInt(lock, 10);
-    if (Date.now() - lockTime < 5 * 60 * 1000) {
+    if (Date.now() - result.created_at < 5 * 60 * 1000) {
       return false; // Lock is still valid
     }
   }
 
-  await AsyncStorage.setItem(SYNC_LOCK_KEY, Date.now().toString());
+  // Acquire lock (upsert)
+  const timestamp = Date.now();
+  await db.runAsync(
+    'INSERT OR REPLACE INTO documents (key, value, created_at, updated_at) VALUES (?, ?, ?, ?)',
+    [SYNC_LOCK_KEY, 'locked', timestamp, timestamp]
+  );
   return true;
 }
 
@@ -158,5 +135,6 @@ export async function acquireSyncLock(): Promise<boolean> {
  * Release sync lock
  */
 export async function releaseSyncLock(): Promise<void> {
-  await AsyncStorage.removeItem(SYNC_LOCK_KEY);
+  const db = await getDB();
+  await db.runAsync('DELETE FROM documents WHERE key = ?', [SYNC_LOCK_KEY]);
 }

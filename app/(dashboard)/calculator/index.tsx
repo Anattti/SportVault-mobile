@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dumbbell, Hash, Calculator } from 'lucide-react-native';
-import { DashboardHeader } from '@/components/layout/DashboardHeader';
 
 const percentages = [
     { reps: 1, percentage: 100 },
@@ -72,7 +71,6 @@ export default function CalculatorScreen() {
 
     return (
         <View style={styles.container}>
-            <DashboardHeader />
             <ScrollView 
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"

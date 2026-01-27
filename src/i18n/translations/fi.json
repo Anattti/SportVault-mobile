@@ -223,7 +223,13 @@
     "vs_last_week": "vs. viime viikko",
     "goals": "Tavoitteet",
     "new_goal": "Uusi tavoite",
-    "no_active_goals": "Ei aktiivisia tavoitteita"
+    "no_active_goals": "Ei aktiivisia tavoitteita",
+    "weekly_overview": "Viikkokatsaus",
+    "workouts": "Treenit",
+    "duration": "Kesto",
+    "total_volume": "Volyymi",
+    "active_goals": "Aktiiviset tavoitteet",
+    "no_goals": "Ei tavoitteita"
   },
   "session": {
     "header": {
@@ -268,7 +274,9 @@
       "offline_saved_title": "Tallennettu paikallisesti",
       "offline_saved_message": "Treeni tallennetaan Supabaseen kun verkkoyhteys palautuu.",
       "save_error": "Treenin tallennus epäonnistui. Tarkista verkkoyhteys.",
-      "load_error": "Treenin lataus epäonnistui"
+      "load_error": "Treenin lataus epäonnistui",
+      "rest_complete": "Lepo valmis!",
+      "rest_complete_body": "Seuraavan sarjan vuoro! 💪"
     },
     "exercise_card": {
       "set_num": "Sarja {{num}}",

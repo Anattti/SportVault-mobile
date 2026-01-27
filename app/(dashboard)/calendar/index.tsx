@@ -17,7 +17,6 @@ import {
   ScheduleModal,
 } from '@/components/calendar';
 import { CalendarDay } from '@/types/calendar';
-import { DashboardHeader } from '@/components/layout/DashboardHeader';
 
 export default function CalendarScreen() {
   const { t } = useTranslation();
@@ -83,7 +82,7 @@ export default function CalendarScreen() {
 
   return (
     <View style={styles.container}>
-      <DashboardHeader />
+
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}

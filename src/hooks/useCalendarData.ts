@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { CalendarDay, CalendarMonth, ScheduledWorkout, CompletedSession } from '@/types/calendar';
 import { useScheduledWorkouts } from './useScheduledWorkouts';
-import { useWorkoutHistory, WorkoutSession } from './useWorkoutHistory';
+import { useWorkoutHistory, WorkoutSession, useWorkoutStats } from './useWorkoutHistory';
 
 // Helper functions
 function getMonthStartEnd(year: number, month: number) {
@@ -13,8 +13,11 @@ function getMonthStartEnd(year: number, month: number) {
   };
 }
 
-function formatDateString(date: Date): string {
-  return date.toISOString().split('T')[0];
+function toLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function isSameDay(date1: Date, date2: Date): boolean {
@@ -41,7 +44,9 @@ function generateCalendarDays(
   const sessionsByDate = new Map<string, WorkoutSession[]>();
   for (const session of completedSessions) {
     if (session.date) {
-      const dateKey = session.date.split('T')[0]; // Extract YYYY-MM-DD
+      // Create date object from UTC string to get local time representation
+      const dateObj = new Date(session.date);
+      const dateKey = toLocalDateString(dateObj); 
       const existing = sessionsByDate.get(dateKey) || [];
       existing.push(session);
       sessionsByDate.set(dateKey, existing);
@@ -50,14 +55,18 @@ function generateCalendarDays(
   
   const scheduledByDate = new Map<string, ScheduledWorkout[]>();
   for (const scheduled of scheduledWorkouts) {
-    const existing = scheduledByDate.get(scheduled.scheduledDate) || [];
+    // Scheduled workouts typically store literal date string "YYYY-MM-DD"
+    // So we can use it directly OR ensure consistency if it's full ISO
+    // Assuming scheduledDate is "YYYY-MM-DD":
+    const dateKey = scheduled.scheduledDate.split('T')[0]; 
+    const existing = scheduledByDate.get(dateKey) || [];
     existing.push(scheduled);
-    scheduledByDate.set(scheduled.scheduledDate, existing);
+    scheduledByDate.set(dateKey, existing);
   }
   
   // Helper to create day data with O(1) lookups
   const createDayData = (date: Date, isCurrentMonth: boolean): CalendarDay => {
-    const dateString = formatDateString(date);
+    const dateString = toLocalDateString(date);
     const daySessions = sessionsByDate.get(dateString) || [];
     const dayScheduled = scheduledByDate.get(dateString) || [];
     
@@ -118,21 +127,13 @@ export function useCalendarData(year: number, month: number) {
   } = useScheduledWorkouts(startDate, endDate);
 
   const {
-    sessions,
+    data: monthSessions,
     isLoading: isLoadingHistory,
-  } = useWorkoutHistory();
-
-  // Filter sessions to current month
-  const monthSessions = useMemo(() => {
-    return sessions.filter(session => {
-      if (!session.date) return false;
-      const sessionDate = new Date(session.date);
-      return sessionDate.getFullYear() === year && sessionDate.getMonth() === month;
-    });
-  }, [sessions, year, month]);
+    error: historyError,
+  } = useWorkoutStats(startDate, endDate);
 
   const calendarDays = useMemo(() => {
-    return generateCalendarDays(year, month, scheduledWorkouts, monthSessions);
+    return generateCalendarDays(year, month, scheduledWorkouts, monthSessions || []);
   }, [year, month, scheduledWorkouts, monthSessions]);
 
   const calendarMonth: CalendarMonth = useMemo(() => ({
@@ -144,9 +145,9 @@ export function useCalendarData(year: number, month: number) {
   return {
     calendarMonth,
     scheduledWorkouts,
-    completedSessions: monthSessions,
+    completedSessions: monthSessions || [],
     isLoading: isLoadingScheduled || isLoadingHistory,
-    error: scheduledError,
+    error: scheduledError || historyError,
   };
 }
 

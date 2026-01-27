@@ -10,6 +10,7 @@ export interface WarmupCooldownExercise {
   duration: number; // seconds
   type: WarmupCooldownType;
   completed?: boolean;
+  notes?: string;
 }
 
 export interface WarmupData {

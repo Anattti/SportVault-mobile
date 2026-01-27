@@ -271,6 +271,13 @@ export default function ProfileScreen() {
             <Text style={styles.logoutText}>{t('profile.logout')}</Text>
           </Pressable>
 
+          <Pressable 
+              style={[styles.logoutButton, { borderTopWidth: 0, marginTop: 0 }]} 
+              onPress={() => router.push('/(dashboard)/settings/heart-rate')}
+          >
+             <Text style={[styles.logoutText, { color: Colors.neon.DEFAULT }]}>Heart Rate Devices</Text>
+          </Pressable>
+
         </View>
       </ScrollView>
     </View>

@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-// SafeAreaView ei tarvita - _layout.tsx hoitaa safe area:n
 import { useQuery } from '@tanstack/react-query';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Zap, Target } from 'lucide-react-native';
 
@@ -28,6 +27,7 @@ import {
   type WorkoutSessionWithSets,
 } from '@/lib/analytics';
 import { DashboardHeader } from '@/components/layout/DashboardHeader';
+import { Spacing } from '@/constants/Layout';
 
 // Simple bar chart component
 function SimpleBarChart({ data, maxValue }: { data: { label: string; value: number }[]; maxValue: number }) {
@@ -93,7 +93,7 @@ export default function AnalyticsScreen() {
       if (!user) return null;
 
       const sessionsWithDetails: WorkoutSessionWithSets[] = [];
-      const processedIds = new Set<string>();
+
 
       // 1. Fetch workout sessions (new format)
       const { data: sessions, error: sessionsError } = await supabase
@@ -114,7 +114,7 @@ export default function AnalyticsScreen() {
 
       // Fetch session exercises and sets for each session
       for (const session of sessions || []) {
-        processedIds.add(session.id);
+
         
         const { data: exercises } = await supabase
           .from('session_exercises')
@@ -128,15 +128,9 @@ export default function AnalyticsScreen() {
           `)
           .eq('session_id', session.id);
 
-        // Get exercise categories from the original exercises table
-        const { data: workoutExercises } = await supabase
-          .from('exercises')
-          .select('name, category')
-          .eq('workout_id', session.workout_id);
-
-        const categoryMap = new Map(
-          workoutExercises?.map(e => [e.name, e.category]) || []
-        );
+        // Get exercise categories from the original exercises table (optional, used for broad categorizing)
+        // Optimization: Could batch fetch or just store category in session_exercises if needed.
+        // For now, defaulting category to null or basic inference if needed later.
 
         sessionsWithDetails.push({
           id: session.id,
@@ -145,7 +139,7 @@ export default function AnalyticsScreen() {
           total_volume: session.total_volume || 0,
           exercises: (exercises || []).map(ex => ({
             name: ex.name,
-            category: categoryMap.get(ex.name) || null,
+            category: null, 
             sets: (ex.session_sets || []).map((s: any) => ({
               weight_used: s.weight_used || 0,
               reps_completed: s.reps_completed || 0,
@@ -154,74 +148,8 @@ export default function AnalyticsScreen() {
         });
       }
 
-      // 2. Fetch workout results (legacy format)
-      const { data: results, error: resultsError } = await supabase
-        .from('workout_results')
-        .select(`
-          id,
-          completed_at,
-          duration,
-          workout_id,
-          created_at
-        `)
-        .eq('user_id', user.id)
-        .order('completed_at', { ascending: false })
-        .limit(100);
-
-      if (!resultsError && results) {
-        for (const result of results) {
-          // Skip if already processed (dual-write scenario)
-          if (processedIds.has(result.id)) continue;
-
-          // Check for fuzzy duplicates (same workout within 1 minute)
-          const resultTime = new Date(result.completed_at || result.created_at || 0).getTime();
-          const isDuplicate = sessionsWithDetails.some(s => {
-            if (s.id === result.id) return true;
-            const sessionTime = new Date(s.date).getTime();
-            return Math.abs(sessionTime - resultTime) < 60000;
-          });
-          if (isDuplicate) continue;
-
-          // Fetch set results for this workout result
-          const { data: setResults } = await supabase
-            .from('workout_set_results')
-            .select('exercise_name, weight, reps')
-            .eq('workout_result_id', result.id);
-
-          // Group sets by exercise
-          const exerciseMap = new Map<string, { weight_used: number; reps_completed: number }[]>();
-          for (const set of setResults || []) {
-            const existing = exerciseMap.get(set.exercise_name) || [];
-            existing.push({
-              weight_used: set.weight || 0,
-              reps_completed: set.reps || 0,
-            });
-            exerciseMap.set(set.exercise_name, existing);
-          }
-
-          // Calculate total volume
-          let totalVolume = 0;
-          for (const sets of exerciseMap.values()) {
-            for (const set of sets) {
-              totalVolume += set.weight_used * set.reps_completed;
-            }
-          }
-
-          sessionsWithDetails.push({
-            id: result.id,
-            date: result.completed_at || result.created_at || '',
-            duration: result.duration || 0,
-            total_volume: totalVolume,
-            exercises: Array.from(exerciseMap.entries()).map(([name, sets]) => ({
-              name,
-              category: null,
-              sets,
-            })),
-          });
-        }
-      }
-
-      // Sort all sessions by date (most recent first)
+      // Legacy fetching removed as per request.
+      
       sessionsWithDetails.sort((a, b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
@@ -231,10 +159,9 @@ export default function AnalyticsScreen() {
       return sessionsWithDetails;
     },
     enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Calculate analytics
   const weeklyVolume = useMemo(() => {
     if (!analyticsData) return [];
     return getWeeklyVolumeTrend(analyticsData, 8);
@@ -248,7 +175,6 @@ export default function AnalyticsScreen() {
   const plateaus = useMemo(() => {
     if (!analyticsData) return [];
     
-    // Group by exercise
     const exerciseMap = new Map<string, { date: string; sets: any[] }[]>();
     
     for (const session of analyticsData) {
@@ -270,7 +196,6 @@ export default function AnalyticsScreen() {
     return detectPlateaus(histories);
   }, [analyticsData]);
 
-  // Get e1RM trends for top exercises
   const e1rmTrends = useMemo(() => {
     if (!analyticsData) return [];
     
@@ -287,13 +212,22 @@ export default function AnalyticsScreen() {
       }
     }
 
-    // Get trends for exercises with most sessions
+    // Filter out exercises with too few sessions to be meaningful (e.g., < 3)
+    // And pick top 5 most frequent
     const sorted = Array.from(exerciseMap.entries())
+      .filter(([_, sessions]) => sessions.length >= 3)
       .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, 3);
+      .slice(0, 5);
 
     return sorted.map(([name, sessions]) => getExerciseE1RMTrend(name, sessions));
   }, [analyticsData]);
+
+  const formatVolume = (kg: number) => {
+      if (kg >= 1000) return `${(kg / 1000).toFixed(1)}`;
+      return `${kg}`;
+  };
+  
+  const maxVolume = Math.max(...weeklyVolume.map(v => v.volume), 1);
 
   if (isLoading) {
     return (
@@ -303,12 +237,8 @@ export default function AnalyticsScreen() {
     );
   }
 
-  const formatVolume = (kg: number) => (kg / 1000).toFixed(1);
-  const maxVolume = Math.max(...weeklyVolume.map(v => v.volume), 1);
-
   return (
-    <View style={styles.safeArea}>
-      <DashboardHeader />
+    <View style={styles.mainContainer}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -321,6 +251,8 @@ export default function AnalyticsScreen() {
           />
         }
       >
+        <View style={styles.headerSpacer} />
+        
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{t('analytics.title')}</Text>
@@ -368,7 +300,7 @@ export default function AnalyticsScreen() {
 
         {/* E1RM Trends */}
         <View style={styles.sectionHeader}>
-          <Target size={18} color={Colors.text.secondary} />
+          <Target size={18} color={Colors.text.primary} />
           <Text style={styles.sectionTitle}>{t('analytics.one_rm_progression')}</Text>
         </View>
 
@@ -416,7 +348,7 @@ export default function AnalyticsScreen() {
                   {t('analytics.weeks_without_progress', { weeks: plateau.stagnantWeeks })}
                 </Text>
                 <Text style={styles.plateauSuggestion}>
-                  {t(plateau.suggestionKey, plateau.suggestionParams)}
+                  {t(plateau.suggestionKey, plateau.suggestionParams) as string}
                 </Text>
               </View>
             ))}
@@ -430,7 +362,7 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  mainContainer: {
     flex: 1,
     backgroundColor: Colors.background,
   },
@@ -438,7 +370,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.horizontal,
   },
   loadingContainer: {
     flex: 1,
@@ -446,14 +378,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerSpacer: {
+    height: 12, // Space between top and first card (or DashboardHeader handles it?)
+    // Actually DashboardHeader is global now so we don't render it here 
+    // BUT analytics/index.tsx might need padding top if global header is present.
+    // _layout.tsx says !isFullscreen && <DashboardHeader />
+    // analytics/index DOES have DashboardHeader.
+    // The previous implementation did not include DashboardHeader in the render.
+    // The global _layout handles it. So we just need padding.
+  },
   header: {
-    marginTop: 0,
+    marginTop: 12,
     marginBottom: 24,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: '900',
     color: Colors.text.primary,
+    fontFamily: 'InstrumentSans-Bold',
   },
   headerSubtitle: {
     fontSize: 14,
@@ -485,7 +427,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   chartCard: {
-    backgroundColor: '#111111',
+    backgroundColor: Colors.card.background,
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
@@ -512,9 +454,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '900',
     color: Colors.neon.DEFAULT,
-  },
-  chartContainer: {
-    marginHorizontal: -16,
+    fontFamily: 'InstrumentSans-Bold',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -527,9 +467,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: Colors.text.primary,
+    fontFamily: 'InstrumentSans-Bold',
   },
   trendCard: {
-    backgroundColor: '#111111',
+    backgroundColor: Colors.card.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -564,6 +505,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: Colors.text.primary,
+    fontFamily: 'InstrumentSans-Bold',
   },
   plateauCard: {
     backgroundColor: 'rgba(245, 158, 11, 0.05)',

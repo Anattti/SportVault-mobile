@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 10,
+    paddingTop: 0,
     paddingBottom: 10,
   },
   title: {
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   setBlock: {
     backgroundColor: "#161616",
     borderRadius: 16,
-    padding: 12,
+    padding: 10,
     marginBottom: 8,
   },
   setBlockRow: {
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   setInputsContainer: {
     flex: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     alignItems: 'center',
   },
   inputWrapper: {
@@ -336,10 +336,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     borderRadius: 12,
     height: 44,
-    paddingLeft: 12,
-    paddingRight: 30, // Space for suffix
+    paddingLeft: 8,
+    paddingRight: 24, // Space for suffix
     color: "#fff",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     textAlign: "center",
     borderWidth: 1,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   },
   inputSuffix: {
     position: 'absolute',
-    right: 12,
+    right: 8,
     color: "#666",
     fontSize: 10,
     fontWeight: "700",
@@ -1037,7 +1037,7 @@ const safeParseFloat = (val: string | undefined | null, defaultVal: number = 0):
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { paddingTop: Platform.OS === 'android' ? insets.top : 16 }]}>
         <View style={styles.header}>
           <Text style={styles.title}>{id ? t('workouts.edit_workout') : t('workouts.create_workout')}</Text>
           <Pressable onPress={() => router.back()} style={styles.closeBtn}>

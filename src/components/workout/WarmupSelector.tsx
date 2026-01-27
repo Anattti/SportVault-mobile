@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   Modal,
+  TextInput,
 } from 'react-native';
 import { Flame, X, Check, Plus, Clock } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
@@ -94,6 +95,7 @@ export function WarmupSelector({ visible, onClose, onStart, onSkip }: WarmupSele
                 ]}
                 onPress={() => toggleExercise(exercise)}
               >
+               <View style={styles.exerciseHeaderRow}>
                 <View style={styles.exerciseInfo}>
                   <View 
                     style={[styles.typeBadge, { backgroundColor: `${typeColor}20` }]}
@@ -114,6 +116,24 @@ export function WarmupSelector({ visible, onClose, onStart, onSkip }: WarmupSele
                 ]}>
                   {isSelected && <Check size={16} color="#000" />}
                 </View>
+               </View>
+
+               {isSelected && (
+                  <View style={styles.noteContainer}>
+                    <TextInput
+                        style={styles.noteInput}
+                        placeholder="Lisää muistiinpano..."
+                        placeholderTextColor={Colors.text.secondary}
+                        value={selectedExercises.find(e => e.id === exercise.id)?.notes || ''}
+                        onChangeText={(text) => {
+                            setSelectedExercises(prev => prev.map(e => 
+                                e.id === exercise.id ? { ...e, notes: text } : e
+                            ));
+                        }}
+                        onPressIn={(e) => e.stopPropagation()}
+                    />
+                  </View>
+               )}
               </Pressable>
             );
           })}
@@ -209,15 +229,30 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   exerciseCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     padding: 16,
     marginBottom: 8,
     backgroundColor: '#111111',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  exerciseHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  noteContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  noteInput: {
+    color: Colors.text.primary,
+    fontSize: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
+    padding: 10,
   },
   exerciseCardSelected: {
     borderColor: Colors.neon.DEFAULT,
