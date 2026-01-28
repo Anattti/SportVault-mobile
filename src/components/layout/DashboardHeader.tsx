@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { Colors } from "@/constants/Colors";
 import { Spacing } from "@/constants/Layout";
 import { BoltLogo } from "@/components/ui/BoltLogo";
-import { Plus, Activity, History, TrendingUp, Calendar, Calculator } from "lucide-react-native";
+import { Plus, Activity, History, TrendingUp, Calendar, Calculator, Settings } from "lucide-react-native";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/Button";
@@ -66,7 +66,7 @@ function EasterEggBolt() {
     } else {
         heartBeat.value = withTiming(1);
     }
-  }, [showHeart, status, currentBpm]); // Pulse faster with high BPM? For now constant beat.
+  }, [showHeart, status, currentBpm]);
 
   const boltStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scaleBolt.value }],
@@ -91,26 +91,79 @@ function EasterEggBolt() {
   const fillColor = status === 'connected' ? Colors.status.destructive : '#333';
 
   return (
-    <Pressable onPress={toggle} style={{ width: 24, height: 24, justifyContent: 'center' }}>
+    <Pressable onPress={toggle} style={styles.boltContainer}>
       <Animated.View style={boltStyle}>
         <BoltLogo size={24} />
       </Animated.View>
       
       <Animated.View style={heartStyle}>
         <Heart size={28} color={fillColor} fill={fillColor} />
-        <Text style={{ 
-            position: 'absolute', 
-            color: 'white', 
-            fontSize: 10, 
-            fontWeight: 'bold',
-            textAlign: 'center'
-        }}>
+        <Text style={styles.heartText}>
             {displayText}
         </Text>
       </Animated.View>
     </Pressable>
   );
 }
+
+const UserIndicator = ({ nickname }: { nickname?: string }) => {
+  const router = useRouter();
+  const { t } = useTranslation();
+  
+  return (
+    <Pressable 
+      style={styles.userIndicator} 
+      onPress={() => router.push("/settings")}
+      accessibilityRole="button"
+      accessibilityLabel={t('common.profile', 'Profile')}
+    >
+      <Text style={styles.userIndicatorText}>{nickname || '...'}</Text>
+    </Pressable>
+  );
+};
+
+const StaticHeaderTop = React.memo(({ 
+  onSettingsPress, 
+  onAddWorkoutPress 
+}: { 
+  onSettingsPress: () => void, 
+  onAddWorkoutPress: () => void 
+}) => {
+  const { t } = useTranslation();
+  
+  return (
+    <View style={styles.header}>
+      <View style={styles.headerLeft}>
+        <View style={styles.brandContainer}>
+          <Text style={styles.brandText}>SportVault</Text>
+          <EasterEggBolt />
+        </View>
+      </View>
+      <View style={styles.headerRight}>
+        <Pressable 
+          onPress={onSettingsPress}
+          style={styles.settingsButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.settings', 'Settings')}
+          hitSlop={8}
+        >
+          <Settings color={Colors.text.primary} size={24} />
+        </Pressable>
+        <Button 
+          style={styles.addWorkoutButton}
+          onPress={onAddWorkoutPress}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.add_workout')}
+        >
+          <View style={styles.addWorkoutContent}>
+            <Plus color="#000" size={20} />
+            <Text style={styles.addWorkoutText}>{t('common.add_workout')}</Text>
+          </View>
+        </Button>
+      </View>
+    </View>
+  );
+});
 
 export function DashboardHeader() {
   const { t } = useTranslation();
@@ -140,25 +193,25 @@ export function DashboardHeader() {
 
   const activeTab = getActiveTab();
 
-  const handleTabChange = (id: string) => {
+  const handleTabChange = useCallback((id: string) => {
     switch(id) {
       case 'workouts':
-        router.push("/(dashboard)/workouts");
+        router.replace("/(dashboard)/workouts");
         break;
       case 'history':
-        router.push("/(dashboard)/history");
+        router.replace("/(dashboard)/history");
         break;
       case 'analytics':
-        router.push("/(dashboard)/analytics");
+        router.replace("/(dashboard)/analytics");
         break;
       case 'calendar':
-        router.push("/(dashboard)/calendar");
+        router.replace("/(dashboard)/calendar");
         break;
       case 'calculator':
-        router.push("/(dashboard)/calculator");
+        router.replace("/(dashboard)/calculator");
         break;
     }
-  };
+  }, [router]);
 
   // Use React Query for profile
   const { data: profile } = useQuery({
@@ -180,27 +233,22 @@ export function DashboardHeader() {
 
   const nickname = profile?.nickname;
 
+  const handleSettingsPress = useCallback(() => {
+    router.push("/settings");
+  }, [router]);
+
+  const handleAddWorkoutPress = useCallback(() => {
+    router.push("/create-workout");
+  }, [router]);
+
   return (
     <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.brandContainer}>
-            <Text style={styles.brandText}>SportVault</Text>
-            <EasterEggBolt />
-          </View>
-        </View>
-        <View style={styles.headerRight}>
-          <Button 
-            style={styles.addWorkoutButton}
-            onPress={() => router.push("/create-workout")}
-          >
-            <View style={styles.addWorkoutContent}>
-              <Plus color="#000" size={20} />
-              <Text style={styles.addWorkoutText}>{t('common.add_workout')}</Text>
-            </View>
-          </Button>
-        </View>
-      </View>
+      <StaticHeaderTop 
+        onSettingsPress={handleSettingsPress}
+        onAddWorkoutPress={handleAddWorkoutPress}
+      />
+      
+      {/* Tabs row with username on left */}
       
       {/* Tabs row with username on left */}
       <View style={styles.tabsRow}>
@@ -209,9 +257,7 @@ export function DashboardHeader() {
           activeTabId={activeTab} 
           onTabChange={handleTabChange} 
         />
-        <Pressable style={styles.userIndicator} onPress={() => router.push("/(dashboard)/profile")}>
-          <Text style={styles.userIndicatorText}>{nickname || '...'}</Text>
-        </Pressable>
+        <UserIndicator nickname={nickname} />
       </View>
       
       <ActiveSessionBanner />
@@ -283,6 +329,22 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "700",
     fontSize: 14,
+  },
+  settingsButton: {
+    padding: 8,
+    marginRight: -8,
+  },
+  boltContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+  },
+  heartText: {
+    position: 'absolute',
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
 

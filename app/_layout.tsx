@@ -62,6 +62,7 @@ function RootLayoutNav() {
           animation: "slide_from_bottom"
         }} 
       />
+      <Stack.Screen name="settings" options={{ headerShown: false }} />
       <Stack.Screen 
         name="create-workout" 
         options={{ 

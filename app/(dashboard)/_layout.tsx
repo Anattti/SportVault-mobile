@@ -9,17 +9,17 @@ export default function DashboardLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.background }}>
       <View style={{ flex: 1 }}>
+        <DashboardHeader />
         <Tabs
           screenOptions={{
-            header: () => <DashboardHeader />,
-            headerShown: true,
+            headerShown: false,
             // Hide native/custom bottom bar completely
             // We use DashboardHeader for navigation
             tabBarStyle: { display: 'none' }, 
             animation: 'fade', // Add fade animation for smoother tab switches if needed due to header staying
           }}
         >
-          <Tabs.Screen name="workouts/index" options={{ headerShown: true }} />
+          <Tabs.Screen name="workouts/index" />
           {/* Explicitly hide header for preview screens - handled by the stack inside or global config? 
               Actually, workouts/[id] is inside the (dashboard) group but NOT a direct tab screen. 
               The (dashboard)/_layout touches ALL screens in this group.

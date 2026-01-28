@@ -33,7 +33,8 @@ export function useWorkoutTemplate(id: string | undefined) {
         .from("exercises")
         .select(`*, exercise_sets (*)`)
         .eq("workout_id", id)
-        .order("order_index", { ascending: true });
+        .order("order_index", { ascending: true })
+        .order("created_at", { ascending: true });
 
       if (exerciseError) throw exerciseError;
 

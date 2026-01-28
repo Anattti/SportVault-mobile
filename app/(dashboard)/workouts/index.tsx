@@ -124,7 +124,7 @@ export default function WorkoutsScreen() {
   const renderItem = ({ item, drag, isActive }: RenderItemParams<Workout>) => (
     <ScaleDecorator activeScale={1.02}>
       <Pressable 
-        onPress={() => router.push(`/(dashboard)/workouts/${item.id}`)}
+        onPress={() => router.push(`/workout-preview/${item.id}`)}
         onLongPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
           drag();

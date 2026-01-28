@@ -420,5 +420,18 @@
     "delete_error": "Failed to delete workout.",
     "cancel": "Cancel",
     "save_changes": "Save Changes"
+  },
+  "settings": {
+    "preferences": "Preferences",
+    "notifications": "Notifications",
+    "apple_health": "Apple Health",
+    "privacy": "Privacy & Security",
+    "connectivity": "Connectivity",
+    "smart_watch": "Smart Watch",
+    "heart_rate": "Heart Rate Sensor",
+    "connected": "Connected",
+    "paired": "Paired",
+    "pro_title": "SportVault Pro",
+    "pro_subtitle": "Unlock elite routines & analytics"
   }
 }

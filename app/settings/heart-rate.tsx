@@ -60,17 +60,11 @@ export default function HeartRateSettings() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft color={Colors.text.primary} size={24} />
-        </Pressable>
-        <Text style={styles.title}>Heart Rate Devices</Text>
-        <View style={{ width: 40 }} /> 
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
+    <View style={styles.container}>
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+      >
           <Text style={styles.sectionTitle}>Data Sources</Text>
           
           {/* Apple Watch Item */}
@@ -172,24 +166,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.glass.border,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.text.primary,
   },
   content: {
     padding: 20,

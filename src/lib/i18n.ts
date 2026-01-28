@@ -5,8 +5,12 @@ import fi from '../i18n/translations/fi.json';
 import en from '../i18n/translations/en.json';
 
 const resources = {
-  fi: { translation: fi },
-  en: { translation: en },
+  fi: { 
+    translation: fi
+  },
+  en: { 
+    translation: en
+  },
 };
 
 // Get the device's current locale

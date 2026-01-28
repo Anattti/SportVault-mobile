@@ -425,5 +425,18 @@
     "notes_placeholder": "Kirjoita muistiinpano...",
     "exercise_notes_label": "Liikkeen muistiinpanot",
     "exercise_notes_placeholder": "Kirjoita muistiinpano liikkeelle..."
+  },
+  "settings": {
+    "preferences": "Asetukset",
+    "notifications": "Ilmoitukset",
+    "apple_health": "Apple Health",
+    "privacy": "Yksityisyys & Turvallisuus",
+    "connectivity": "Yhdistettävyys",
+    "smart_watch": "Älykello",
+    "heart_rate": "Sykeanturi",
+    "connected": "Yhdistetty",
+    "paired": "Paritettu",
+    "pro_title": "SportVault Pro",
+    "pro_subtitle": "Avaa eliittitason analytiikka & rutiinit"
   }
 }

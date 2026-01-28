@@ -39,8 +39,16 @@ Tämä tiedosto sisältää listauksen sovelluksen tärkeimmistä näkymistä ja
   - Tiedosto: [app/(dashboard)/calendar/index.tsx](<file:///Users/antti/Projektit/sportvault-mobile/app/(dashboard)/calendar/index.tsx>)
 - **Laskin (esim. 1RM tai levylaskin):** Aputyökalut treenin tueksi.
   - Tiedosto: [app/(dashboard)/calculator/index.tsx](<file:///Users/antti/Projektit/sportvault-mobile/app/(dashboard)/calculator/index.tsx>)
-- **Profiili ja asetukset:** Käyttäjätiedot ja sovelluksen asetukset.
-  - Tiedosto: [app/(dashboard)/profile.tsx](<file:///Users/antti/Projektit/sportvault-mobile/app/(dashboard)/profile.tsx>)
+- **Profiili ja asetukset:** Käyttäjätiedot ja sovelluksen asetukset (Settings Hub).
+  - Päänäkymä: [app/settings/index.tsx](file:///Users/antti/Projektit/sportvault-mobile/app/settings/index.tsx)
+  - Asettelu (Stack): [app/settings/\_layout.tsx](file:///Users/antti/Projektit/sportvault-mobile/app/settings/_layout.tsx)
+  - Alasivut:
+    - [app/settings/edit-profile.tsx](file:///Users/antti/Projektit/sportvault-mobile/app/settings/edit-profile.tsx)
+    - [app/settings/notifications.tsx](file:///Users/antti/Projektit/sportvault-mobile/app/settings/notifications.tsx)
+    - [app/settings/privacy.tsx](file:///Users/antti/Projektit/sportvault-mobile/app/settings/privacy.tsx)
+    - [app/settings/apple-health.tsx](file:///Users/antti/Projektit/sportvault-mobile/app/settings/apple-health.tsx)
+    - [app/settings/smart-watch.tsx](file:///Users/antti/Projektit/sportvault-mobile/app/settings/smart-watch.tsx)
+    - [app/settings/heart-rate.tsx](file:///Users/antti/Projektit/sportvault-mobile/app/settings/heart-rate.tsx)
 
 ### 5. Ydinlogiikka ja Komponentit
 
