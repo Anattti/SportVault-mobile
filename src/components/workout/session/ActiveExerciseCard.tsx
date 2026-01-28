@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-native';
-import { MessageSquare, Minus, Plus } from 'lucide-react-native';
+import { MessageSquare, Minus, Plus, Weight, Repeat } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '@/constants/Colors';
 import type { WorkoutExercise, WorkoutSet, SetResult } from '@/types';
@@ -59,9 +59,14 @@ export function ActiveExerciseCard({
       {/* Exercise Header */}
       <View style={styles.header}>
         <View style={styles.exerciseInfo}>
-          <Text style={styles.exerciseIcon}>🏋️</Text>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Text style={styles.exerciseName}>{exercise.name}</Text>
+            {oneRM !== undefined && oneRM > 0 && (
+              <View style={styles.oneRmBadge}>
+                <Text style={styles.oneRmLabel}>1RM</Text>
+                <Text style={styles.oneRmValue}>{oneRM}</Text>
+              </View>
+            )}
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -79,20 +84,14 @@ export function ActiveExerciseCard({
         </View>
       </View>
 
-      {/* 1RM Badge */}
-      {oneRM && (
-        <View style={styles.oneRmBadge}>
-          <Text style={styles.oneRmLabel}>{t('calculator.title_short', '1RM')}</Text>
-          <Text style={styles.oneRmValue}>{oneRM} {t('calculator.unit_kg')}</Text>
-        </View>
-      )}
+
 
       {/* Input Section */}
       <View style={styles.inputsRow}>
         {/* Weight Input */}
         <View style={styles.inputCard}>
           <View style={styles.inputHeader}>
-            <Text style={styles.inputIcon}>🏋️</Text>
+            <Weight size={14} color={Colors.neon.DEFAULT} />
             <Text style={styles.inputLabel}>{t('session.exercise_card.weight').toUpperCase()}</Text>
           </View>
           <View style={styles.inputValueRow}>
@@ -129,7 +128,7 @@ export function ActiveExerciseCard({
         {/* Reps Input */}
         <View style={styles.inputCard}>
           <View style={styles.inputHeader}>
-            <Text style={styles.inputIcon}>⇆</Text>
+            <Repeat size={14} color={Colors.neon.DEFAULT} />
             <Text style={styles.inputLabel}>{t('session.exercise_card.reps').toUpperCase()}</Text>
           </View>
           <View style={styles.inputValueRow}>
@@ -193,14 +192,12 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  exerciseIcon: {
-    fontSize: 20,
-  },
+
   exerciseName: {
     fontSize: 18,
     fontWeight: '700',
     color: Colors.text.primary,
-    flex: 1,
+    flexShrink: 1,
   },
   headerRight: {
     flexDirection: 'row',
@@ -229,23 +226,22 @@ const styles = StyleSheet.create({
   oneRmBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: Colors.neon.faint,
     borderWidth: 1,
     borderColor: Colors.neon.border,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   oneRmLabel: {
     color: Colors.text.muted,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
   oneRmValue: {
     color: Colors.neon.DEFAULT,
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '700',
   },
   inputsRow: {
@@ -264,10 +260,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  inputIcon: {
-    fontSize: 14,
-    color: Colors.neon.DEFAULT,
-  },
+
   inputLabel: {
     fontSize: 11,
     fontWeight: '700',

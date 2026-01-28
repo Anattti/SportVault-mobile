@@ -28,6 +28,7 @@ import { workoutHistoryKeys } from '@/hooks/useWorkoutHistory';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import Animated, { FadeIn, SlideInUp } from 'react-native-reanimated';
+import { useExerciseBestE1RM } from '@/hooks/useExerciseStats';
 
 type Exercise = Database["public"]["Tables"]["exercises"]["Row"];
 type ExerciseSet = Database["public"]["Tables"]["exercise_sets"]["Row"];
@@ -409,6 +410,9 @@ function WorkoutSessionContent({
     initialState: initialState as any // Cast because of import complexity, types match runtime
   });
 
+  // Fetch 1RM for current exercise
+  const { data: oneRM } = useExerciseBestE1RM(workoutState.currentExercise?.id);
+
   const [reorderModalVisible, setReorderModalVisible] = useState(false);
 
   const handleReorderSave = (newOrder: number[]) => {
@@ -764,6 +768,7 @@ function WorkoutSessionContent({
               onRepsChange={(reps) => workoutState.updateCurrentResult({ reps })}
               onToggleNotes={onToggleNotes}
               notesVisible={notesVisible}
+              oneRM={oneRM || undefined}
             />
 
             <RPESlider
