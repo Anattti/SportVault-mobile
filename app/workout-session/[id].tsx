@@ -125,7 +125,7 @@ export default function WorkoutSessionScreen() {
   };
 
   const handleWarmupSkip = () => {
-    setWarmupData({ duration: 0, method: 'muu', intensity: 'keskitaso', notes: '', skipped: true });
+    setWarmupData({ duration: 0, method: 'muu', intensity: 5, notes: '', skipped: true });
     setPhase('workout');
   };
 
@@ -135,7 +135,7 @@ export default function WorkoutSessionScreen() {
   };
 
   const handleCooldownSkip = () => {
-    setCooldownData({ duration: 0, method: 'muu', intensity: 'keskitaso', notes: '', skipped: true });
+    setCooldownData({ duration: 0, method: 'muu', intensity: 5, notes: '', skipped: true });
     setPhase('complete');
   };
 
@@ -191,6 +191,7 @@ export default function WorkoutSessionScreen() {
           visible={true}
           onComplete={handleWarmupComplete}
           onSkip={handleWarmupSkip}
+          workoutType={workoutTemplate?.workout_type ?? 'other'}
         />
       )}
 
