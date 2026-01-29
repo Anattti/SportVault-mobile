@@ -5,7 +5,7 @@ import { Colors } from '@/constants/Colors';
 import { Heart, Watch, Bluetooth, AlertCircle } from 'lucide-react-native';
 
 export const LiveHeartRate = () => {
-  const { currentBpm, status, activeSourceType } = useHeartRate();
+  const { currentBpm, status, activeSourceType, lastSample } = useHeartRate();
 
   const getIcon = () => {
     if (activeSourceType === 'apple_health') return <Watch size={16} color={Colors.neon.DEFAULT} />;
@@ -13,20 +13,53 @@ export const LiveHeartRate = () => {
     return <Heart size={16} color={Colors.text.secondary} />;
   };
 
-  const getStatusColor = () => {
-    if (status === 'connected') return Colors.neon.DEFAULT;
-    if (status === 'scanning' || status === 'connecting') return Colors.text.secondary;
-    if (status === 'error') return Colors.status.destructive;
-    return Colors.text.secondary;
+  const getSignalStrength = () => {
+      // RSSI visualization
+      if (activeSourceType !== 'ble' || !lastSample?.rssi) return null;
+      
+      const rssi = lastSample.rssi;
+      
+      // Typical BLE RSSI ranges:
+      // > -60: Excellent (4 bars)
+      // > -70: Good (3 bars)
+      // > -80: Fair (2 bars)
+      // < -80: Poor (1 bar)
+      
+      const bars = [1, 2, 3, 4];
+      let strength = 0;
+      if (rssi > -60) strength = 4;
+      else if (rssi > -70) strength = 3;
+      else if (rssi > -80) strength = 2;
+      else strength = 1;
+
+      return (
+          <View style={styles.signalContainer}>
+              {bars.map(bar => (
+                  <View 
+                      key={bar} 
+                      style={[
+                          styles.signalBar, 
+                          { 
+                              height: 6 + (bar * 2), 
+                              backgroundColor: bar <= strength ? Colors.neon.DEFAULT : Colors.text.muted 
+                          }
+                      ]} 
+                  />
+              ))}
+          </View>
+      );
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.iconContainer}>
-            {getIcon()}
+        <View style={styles.headerLeft}>
+            <View style={styles.iconContainer}>
+                {getIcon()}
+            </View>
+            <Text style={styles.label}>Heart Rate</Text>
         </View>
-        <Text style={styles.label}>Heart Rate</Text>
+        {getSignalStrength()}
       </View>
       
       <View style={styles.valueContainer}>
@@ -62,8 +95,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
-    gap: 6,
+  },
+  headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
   },
   iconContainer: {
       opacity: 0.8,
@@ -74,6 +112,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  signalContainer: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 2,
+      height: 14,
+  },
+  signalBar: {
+      width: 3,
+      borderRadius: 1,
   },
   valueContainer: {
     flexDirection: 'row',

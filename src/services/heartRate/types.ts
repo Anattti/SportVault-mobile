@@ -2,6 +2,7 @@ export type HeartRateSample = {
   value: number; // BPM
   timestamp: string;
   source: 'apple_health' | 'ble_device' | 'manual';
+  rssi?: number;
 };
 
 export type HeartRateSourceStatus = 'connected' | 'disconnected' | 'scanning' | 'connecting' | 'error';

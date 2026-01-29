@@ -3,6 +3,9 @@ import { AppleHealthSource } from '../services/heartRate/AppleHealthSource';
 import { BluetoothSource } from '../services/heartRate/BluetoothSource';
 import { IHeartRateSource, HeartRateSample, HeartRateSourceStatus } from '../services/heartRate/types';
 import { AppState } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+
+const LAST_DEVICE_ID_KEY = 'last_connected_hr_device_id';
 
 type SourceType = 'none' | 'apple_health' | 'ble';
 
@@ -48,29 +51,51 @@ export const HeartRateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
      const handleAutoConnect = async () => {
          // Prevent auto-connect if we already have a source
-         // (You might want to allow switching from 'none' to 'ble' seamlessly, but not overriding existing)
-         // We'll read the current state inside the effect or use a ref if needed, 
-         // but here we rely on the closure or check activeSourceType if we added it to dependency (careful of loops).
-         // Ideally, check if we are disconnected.
+         if (activeSourceTypeRef.current !== 'none') {
+             return;
+         }
          
-         // 1. Try to find a system-connected BLE device
          try {
-             // Only auto-connect if we aren't already using something (or if we want to prioritize BLE)
-             if (activeSourceTypeRef.current !== 'none') {
+             // 1. First check if we have any system-connected devices (already paired/used by OS)
+             // This is fast and reliable for devices currently active.
+             const connectedDevices = await bluetoothSource.getConnectedDevices();
+             
+             if (connectedDevices.length > 0) {
+                 const device = connectedDevices[0];
+                 console.log('[HeartRateContext] Auto-connecting to system device:', device.name || device.id);
+                 await connectSource('ble', device.id);
                  return;
              }
              
-             const connectedDevices = await bluetoothSource.getConnectedDevices();
-             if (connectedDevices.length > 0) {
-                 // Found a device handled by system
-                 const device = connectedDevices[0];
-                 console.log('[HeartRateContext] Auto-connecting to system device:', device.name || device.id);
+             // 2. If no system devices, check if we have a saved device ID from previous session
+             const savedDeviceId = await SecureStore.getItemAsync(LAST_DEVICE_ID_KEY);
+             if (savedDeviceId) {
+                 console.log('[HeartRateContext] Found saved device ID, attempting to connect:', savedDeviceId);
+                 // We try to connect to it. The BluetoothSource.connect will probably need to scan or use retrievePeripherals
+                 // depending on implementation. connectToDevice usually works if the device is advertising.
                  
-                 // We only auto-connect if we are currently not connected or connecting?
-                 // For now, let's assume we want to prioritize this device if nothing else is active.
-                 // We can check activeSourceType in a ref to be safe inside async.
-                 await connectSource('ble', device.id);
+                 // Use scanAndConnect here too!
+                 const success = await bluetoothSource.scanAndConnect(savedDeviceId, 5000); // 5s scan
+                 if (success) {
+                      // We need to register it as active source if successful
+                      // scanAndConnect only connects the prompt, but we need to set context state
+                      // Calling connectSource('ble', savedId) is easier as it sets up state,
+                      // BUT connectSource uses .connect() by default. 
+                      // Let's call connectSource BUT we update connectSource to use scanAndConnect? 
+                      // Or just call connectSource passing the logic?
+                      
+                      // Actually, if scanAndConnect succeeded, the device IS connected.
+                      // We can just call connectSource('ble', savedDeviceId) and it might re-connect or just work?
+                      // If we change connectSource to use scanAndConnect it changes behavior for manual selection too (good?).
+                      
+                      // Let's just call connectSource. It calls .connect(). If already connected, .connect() usually handles it?
+                      await connectSource('ble', savedDeviceId);
+                 } else {
+                      // Check if it works with simple connect (if hidden)
+                      // await connectSource('ble', savedDeviceId);
+                 }
              }
+             
          } catch (e) {
              console.warn('[HeartRateContext] Auto-connect BLE failed:', e);
          }
@@ -142,13 +167,96 @@ export const HeartRateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Handle unexpected disconnection
       source.onDisconnected = () => {
           console.log('[HeartRateContext] Source disconnected unexpectedly');
-          // Disconnect fully to clear state
-          disconnect(); 
-          // Optional: Attempt auto-reconnect?
+          
+          // 1. Reset state immediately so UI shows "disconnected" or "connecting"
+          setStatus('disconnected');
+          setCurrentBpm(null);
+          setDeviceName(null);
+          setActiveSource(null); // Clear the active source instance
+          // We DO NOT clear activeSourceType here to indicate we *want* to be connected?
+          // Actually, our UI relies on activeSourceType to show controls. 
+          // Let's keep activeSourceType as 'ble' if we want to show "Connecting..." state?
+          // But connectSource usually resets it. 
+          // Let's set it to 'none' but keep the loop running. 
+          // OR better: Set status to 'connecting' and keep activeSourceType as 'ble' so UI shows the BLE controls/status?
+          // If we set activeSourceType='none', the UI might hide the heart rate entirely if conditional.
+          // Let's keep activeSourceType as 'ble' but activeSource as null.
+          setActiveSourceType('ble'); 
+          setStatus('connecting');
+
+          // 2. Attempt auto-reconnect if it was a BLE device
+          if (type === 'ble' && deviceId) {
+             console.log('[HeartRateContext] Starting persistent auto-reconnect to', deviceId);
+             
+             // Check if we are still meant to be connecting (user didn't press disconnect)
+             // We can use a unique ID for this connection attempt session?
+             // Or just check if activeSource is still null and we are in this loop.
+             
+             const attemptReconnect = async () => {
+                 // Return if user manually disconnected (status would be disconnected/none or source changed)
+                 // However, we set status to connecting above.
+                 // We need a way to stop this loop if 'disconnect()' is called.
+                 // We can check a ref 'shouldReconnect' or similar, but let's use the mounted/active check.
+                 
+                 // If the user called disconnect(), activeSourceType would be 'none'.
+                 if (activeSourceTypeRef.current !== 'ble') {
+                     console.log('[HeartRateContext] Auto-reconnect stopped (method changed or disconnected)');
+                     return;
+                 }
+                 
+                 console.log(`[HeartRateContext] Reconnecting...`);
+                 
+                 // Try to connect
+                 // We use the raw 'connect' from our stored instance or create a new one?
+                 // connectingSource('ble', deviceId) handles instance creation.
+                 // But it also handles state cleanup. 
+                 
+                 // Let's try to connect source. if it fails, wait and recurse.
+                 // We need to re-use the same BluetoothSource instance usually, or create new?
+                 // Context keeps a single 'bluetoothSource' instance.
+                 
+                 // USE SCAN AND CONNECT
+                 // This is more robust for "Out of Range" scenarios than simple connect()
+                 const success = await bluetoothSource.scanAndConnect(deviceId, 6000); // 6s scan timeout
+                 
+                 if (success) {
+                     console.log('[HeartRateContext] Auto-reconnect successful!');
+                     // We need to re-setup the listeners because 'connectSource' usually does that.
+                     // But we are bypassing 'connectSource' to avoid its "disconnect previous" logic which might mess us up?
+                     // Actually, we should probably just call 'setupSource(bluetoothSource)' logic.
+                     
+                     // Re-bind listeners
+                     setActiveSource(bluetoothSource);
+                     setStatus('connected');
+                     setDeviceName(bluetoothSource.getDeviceName());
+                     
+                     bluetoothSource.onDisconnected = source.onDisconnected; // Keep the same handler!
+                     bluetoothSource.observe(handleNewSample);
+                     
+                 } else {
+                     // Failed, wait and try again
+                     if (activeSourceTypeRef.current === 'ble') {
+                         console.log('[HeartRateContext] Reconnect failed, retrying in 2s...');
+                         setTimeout(attemptReconnect, 2000);
+                     }
+                 }
+             };
+             
+             // First attempt after delay
+             setTimeout(attemptReconnect, 1000);
+          }
       };
       
       // Start observer
       source.observe(handleNewSample);
+      
+      // Save device ID for future auto-connect
+      if (type === 'ble' && deviceId) {
+          SecureStore.setItemAsync(LAST_DEVICE_ID_KEY, deviceId).catch(err => {
+              console.warn('Failed to save device ID', err);
+          });
+      }
+
     } else {
       setStatus('error');
     }
@@ -157,13 +265,23 @@ export const HeartRateProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const disconnect = async () => {
+    // Setting this ref/state will stop any pending auto-reconnect loops
+    setActiveSourceType('none'); 
+    
     if (activeSource) {
       await activeSource.disconnect();
       setActiveSource(null);
-      setActiveSourceType('none');
       setStatus('disconnected');
       setCurrentBpm(null);
       setDeviceName(null);
+      
+      // If user manually disconnects, we should probably forget the device so we don't auto-connect
+      // next time against their will.
+      SecureStore.deleteItemAsync(LAST_DEVICE_ID_KEY).catch(() => {});
+      
+    } else {
+        // Even if no active source, we might be in 'connecting' loop
+        setStatus('disconnected');
     }
   };
 

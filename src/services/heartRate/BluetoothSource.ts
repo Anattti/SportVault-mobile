@@ -66,6 +66,70 @@ export class BluetoothSource implements IHeartRateSource {
     }
   }
 
+  async scanAndConnect(deviceId: string, timeout: number = 10000): Promise<boolean> {
+      const manager = this.manager;
+      if (!manager) return false;
+
+      console.log(`[BluetoothSource] scanAndConnect starting for ${deviceId}`);
+      this.status = 'scanning';
+      
+      // 1. First, check if the device is ALREADY connected to the system (OS level).
+      // If the device went out of range and came back, iOS might have reconnected automatically.
+      // In that case, it often won't show up in a scan, so we must check connected peripherals first.
+      try {
+          const connectedSystemDevices = await this.getConnectedDevices();
+          const foundSystemDevice = connectedSystemDevices.find(d => d.id === deviceId);
+          if (foundSystemDevice) {
+              console.log('[BluetoothSource] Device found in system connected devices, connecting directly...');
+              // It's already known to OS, just connect to our manager instance
+              return this.connect(deviceId);
+          }
+      } catch (e) {
+          console.warn('[BluetoothSource] Failed to check system connected devices', e);
+      }
+
+      // 2. If not found in system, start scanning
+      return new Promise<boolean>((resolve) => {
+          let found = false;
+          let scanTimer: NodeJS.Timeout;
+
+          // Timeout handler
+          const timer = setTimeout(() => {
+              if (!found) {
+                  console.log('[BluetoothSource] scanAndConnect timed out');
+                  manager.stopDeviceScan();
+                  resolve(false);
+              }
+          }, timeout);
+
+          // Use NULL as serviceUUIDs to scan for ALL devices.
+          // This is critical for reconnection scenarios where some devices might not
+          // advertise the specific service UUID in the initial packet during reconnection advertising.
+          manager.startDeviceScan(
+              null, // Scan for everything
+              null, 
+              (error, device) => {
+                  if (error) {
+                      console.error('[BluetoothSource] Scan error', error);
+                      clearTimeout(timer);
+                      resolve(false);
+                      return;
+                  }
+
+                  if (device && device.id === deviceId) {
+                      console.log('[BluetoothSource] Found target device during BROAD scan!');
+                      found = true;
+                      manager.stopDeviceScan();
+                      clearTimeout(timer);
+                      
+                      // Now connect
+                      this.connect(deviceId).then(resolve);
+                  }
+              }
+          );
+      });
+  }
+
   // Allow setting the callback
   onDisconnected?: () => void;
 
@@ -142,17 +206,46 @@ export class BluetoothSource implements IHeartRateSource {
   observe(callback: (sample: HeartRateSample) => void): void {
       if (!this.connectedDevice) return;
 
+      // Start RSSI polling loop
+      let lastRssi: number | undefined;
+      const rssiInterval = setInterval(async () => {
+          if (this.connectedDevice && this.status === 'connected') {
+              try {
+                  const updatedDevice = await this.connectedDevice.readRSSI();
+                  lastRssi = updatedDevice.rssi || undefined;
+                  // console.log('RSSI:', lastRssi);
+              } catch (e) {
+                  // Ignore RSSI read errors, they can be frequent
+              }
+          }
+      }, 2000); // Poll every 2 seconds
+
+      // Store interval cleanup
+      this.monitorSubscription = {
+          remove: () => {
+              subscription.remove();
+              clearInterval(rssiInterval);
+          }
+      } as any;
+
       // We don't strictly know if the device was discovered with short or long UUID service,
       // but monitorCharacteristicForService typically works if the service exists.
       // Usually standard is short '180d' for lookup, but let's try strict first.
       
-      this.monitorSubscription = this.connectedDevice.monitorCharacteristicForService(
+      const subscription = this.connectedDevice.monitorCharacteristicForService(
           HEART_RATE_SERVICE_UUID_SHORT, // Try short first as it is most common standard
           HEART_RATE_MEASUREMENT_CHARACTERISTIC,
           (error, characteristic) => {
               if (error) {
                   console.error('Monitor error', error);
-                  // Optional: fallback to long UUID if needed?
+                  // If monitoring fails (e.g. device disconnected/out of range), 
+                  // we need to signal disconnection so the UI and Context know.
+                  this.status = 'disconnected';
+                  this.connectedDevice = null;
+                  clearInterval(rssiInterval); // Stop polling
+                  if (this.onDisconnected) {
+                      this.onDisconnected();
+                  }
                   return;
               }
               if (characteristic?.value) {
@@ -161,7 +254,8 @@ export class BluetoothSource implements IHeartRateSource {
                       callback({
                           value: bpm,
                           timestamp: new Date().toISOString(),
-                          source: 'ble_device'
+                          source: 'ble_device',
+                          rssi: lastRssi
                       });
                   }
               }
