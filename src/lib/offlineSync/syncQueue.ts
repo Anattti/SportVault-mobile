@@ -10,7 +10,7 @@ import { getDB } from '@/lib/db';
 // Actually, let's keep the types exported here as they were.
 
 export type SyncOperationType = 'insert' | 'update' | 'delete';
-export type SyncItemType = 'workout_session' | 'session_exercise' | 'session_set';
+export type SyncItemType = 'workout_session' | 'session_exercise' | 'session_set' | 'workout_template_update';
 
 export interface SyncItem {
   id: string;

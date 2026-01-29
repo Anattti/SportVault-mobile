@@ -42,9 +42,11 @@ export function useWorkoutTemplate(id: string | undefined) {
       const exercises = (exerciseData as ExerciseWithSets[]).map(ex => ({
           ...ex,
           exercise_sets: ex.exercise_sets.sort((a, b) => {
-              // Assuming created_at or id based sort if no order_index for sets? 
-              // Schema usually has set order. Let's assume creation time or standard DB order for now.
-              // If there is an order field, use it. `exercise_sets` usually implies ordered by creation/id.
+              // Use set_index if available (from our migration)
+              const idxA = (a as any).set_index ?? 0;
+              const idxB = (b as any).set_index ?? 0;
+              if (idxA !== idxB) return idxA - idxB;
+              
               return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           })
       }));

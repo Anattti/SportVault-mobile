@@ -154,7 +154,13 @@ export function useWorkoutSessionDetail(sessionId: string) {
 
         exercises = exercisesData.map(ex => ({
           ...ex,
-          sets: setsData?.filter(s => s.session_exercise_id === ex.id) || []
+          sets: (setsData?.filter(s => s.session_exercise_id === ex.id) || []).sort((a, b) => {
+            // Sort by set_index if available
+            const idxA = (a as any).set_index ?? 0;
+            const idxB = (b as any).set_index ?? 0;
+            if (idxA !== idxB) return idxA - idxB;
+            return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+          })
         }));
       }
 

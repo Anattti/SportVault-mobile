@@ -41,6 +41,7 @@ interface ExerciseWithSets extends Exercise {
 }
 
 import { useWorkoutAvgDuration } from "@/hooks/useWorkoutHistory";
+import { useActiveSession } from "@/context/ActiveSessionContext";
 
 export default function WorkoutDetailsScreen() {
   const { t } = useTranslation();
@@ -49,6 +50,7 @@ export default function WorkoutDetailsScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
+  const { activeSession, endSession } = useActiveSession();
   
   const { data: details, isLoading } = useQuery({
     queryKey: ['workout_details', id],
@@ -76,7 +78,16 @@ export default function WorkoutDetailsScreen() {
 
       return {
         workout: workoutData,
-        exercises: exerciseData as ExerciseWithSets[],
+        exercises: (exerciseData as ExerciseWithSets[]).map(ex => ({
+          ...ex,
+          exercise_sets: ex.exercise_sets.sort((a, b) => {
+             // Sort by set_index if available, otherwise by created_at as fallback
+             const idxA = (a as any).set_index ?? 0;
+             const idxB = (b as any).set_index ?? 0;
+             if (idxA !== idxB) return idxA - idxB;
+             return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          })
+        })),
       };
     },
     enabled: !!id,
@@ -148,6 +159,34 @@ export default function WorkoutDetailsScreen() {
         },
       ]
     );
+  };
+
+  const handleStartWorkout = () => {
+    if (activeSession && activeSession.workoutId === id) {
+      Alert.alert(
+        t('session.alerts.resume_title') || "Resume Session?",
+        t('session.alerts.resume_message') || "You have an unfinished session. Do you want to resume it or start new?",
+        [
+            {
+                text: t('session.alerts.start_new') || "Start New",
+                style: "destructive",
+                onPress: () => {
+                    endSession(); // Clear stale session
+                    router.push(`/workout-session/${id}`);
+                }
+            },
+            {
+                text: t('session.alerts.resume') || "Resume",
+                onPress: () => {
+                    router.push(`/workout-session/${id}`);
+                }
+            }
+        ]
+      );
+    } else {
+        // No conflict, just start
+        router.push(`/workout-session/${id}`);
+    }
   };
 
   if (isLoading) {
@@ -247,7 +286,7 @@ export default function WorkoutDetailsScreen() {
       <View style={styles.bottomActions}>
         <Button 
           style={styles.startButton}
-          onPress={() => router.push(`/workout-session/${id}`)}
+          onPress={handleStartWorkout}
         >
           <View style={styles.startButtonContent}>
             <Play color="#000" size={20} fill="#000" />

@@ -3,7 +3,7 @@
  * Matches Next.js PWA design - shown before and after workout session
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   View,
@@ -17,13 +17,28 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  AppState,
 } from 'react-native';
 import { Play, Pause, RotateCcw, Check, ChevronDown, Timer, History, BellRing, Plus, Minus } from 'lucide-react-native';
 import { RPESlider } from './session/RPESlider';
 import { Colors } from '@/constants/Colors';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import Svg, { Circle, G } from 'react-native-svg';
+
+// Configure notifications
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false, // Disable foreground notification sound (we play our own)
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+const completeSound = require('../../../assets/sounds/wooden_mallet.mp3');
 
 export type WarmupMethod = 'juoksumatto' | 'cross-trainer' | 'kuntopyora' | 'soutulaite' | 'hyppynaru' | 'muu';
 export type WarmupIntensity = number;
@@ -70,18 +85,39 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
     return null;
   }, [workoutType]);
 
-  const [duration, setDuration] = useState(0); // Current elapsed time or remaining time based on mode? 
-  // Let's keep 'duration' as the actual time spent for the record.
-  // We need a separate Display Time or Timer State.
-  // Actually, requested: "valita haluaako ajastimen vai ajan kulkemaan 0s eteenpäin"
-  // So we need two modes.
-  
   const [mode, setMode] = useState<'stopwatch' | 'timer'>('stopwatch'); 
   const [targetDuration, setTargetDuration] = useState(300); // Default 5 min for timer
-  const [elapsed, setElapsed] = useState(0); // always counts up for record keeping
-  const [remaining, setRemaining] = useState(300); // for timer mode
-
+  
+  // Timer state
+  const [elapsed, setElapsed] = useState(0); // Display value for stopwatch
+  const [remaining, setRemaining] = useState(300); // Display value for timer
   const [isRunning, setIsRunning] = useState(false);
+
+  // Refs for accurate timing
+  const startTimeRef = useRef<number | null>(null);
+  const pausedTimeRef = useRef<number>(0);
+  const timerStartRef = useRef<number | null>(null); // Start time for countdown
+  
+  // Sound
+  const [sound, setSound] = useState<Audio.Sound>();
+
+  // Use refs for current values in callbacks/effects that don't re-run often
+  const modeRef = useRef(mode);
+  const targetDurationRef = useRef(targetDuration);
+  const isRunningRef = useRef(isRunning);
+
+  useEffect(() => {
+     modeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+     targetDurationRef.current = targetDuration;
+  }, [targetDuration]);
+
+  useEffect(() => {
+      isRunningRef.current = isRunning;
+  }, [isRunning]);
+
   const [method, setMethod] = useState<WarmupMethod>('juoksumatto');
   const [intensity, setIntensity] = useState<WarmupIntensity>(5);
   const [notes, setNotes] = useState('');
@@ -90,79 +126,189 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
   const isWarmup = type === 'warmup';
   const title = isWarmup ? t('session.warmup.warmup_title') : t('session.warmup.cooldown_title');
 
-  // Sound loading
-  const playSound = async () => {
-      try {
-          // Play a simple system sound or use expo-av if asset exists. 
-          // For now, simple Haptic is reliable.
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (e) {
-          console.log('Feedback error', e);
-      }
-  };
-
-  // Timer logic
-  useEffect(() => {
-    if (!isRunning) return;
-
-    const interval = setInterval(() => {
-      setElapsed(prev => prev + 1);
+  // Load sound
+  async function playCompleteSound() {
+    try {
+      console.log('Playing sound');
+      const { sound } = await Audio.Sound.createAsync(completeSound);
+      setSound(sound);
+      await sound.playAsync();
       
-      if (mode === 'timer') {
-        setRemaining(prev => {
-            const next = prev - 1;
-            // Feedback logic
-            if (next === 0) {
-                // Finished
-                playSound();
-                setIsRunning(false);
-                return 0;
-            }
-            if (next === 30) {
-                // Last 30s
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            }
-            if (targetDuration > 0 && next === Math.floor(targetDuration / 2)) {
-                 // Halfway
-                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }
-            return next;
-        });
+      // Haptic feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    } catch (e) {
+      console.log('Error playing sound', e);
+      // Fallback haptics
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      sound?.unloadAsync();
+    };
+  }, [sound]);
+
+  // Request notification permissions
+  useEffect(() => {
+      async function requestPermissions() {
+          const { status } = await Notifications.requestPermissionsAsync();
+          if (status !== 'granted') {
+              console.log('Notification permissions not granted');
+          }
       }
-    }, 1000);
+      requestPermissions();
+  }, []);
+
+  // Timer logic using timestamps
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (isRunning) {
+      if (mode === 'stopwatch') {
+         // Initialize start if needed (e.g. continuing from pause)
+         if (!startTimeRef.current) {
+             startTimeRef.current = Date.now() - pausedTimeRef.current * 1000;
+         }
+      } else {
+         // Timer mode
+         if (!timerStartRef.current) {
+             // Calculate start time based on current remaining to handle pause
+             const alreadyElapsed = targetDuration - remaining;
+             timerStartRef.current = Date.now() - (alreadyElapsed * 1000);
+         }
+      }
+
+      interval = setInterval(() => {
+        const now = Date.now();
+
+        if (mode === 'stopwatch') {
+            if (startTimeRef.current) {
+                const diff = Math.floor((now - startTimeRef.current) / 1000);
+                setElapsed(diff);
+            }
+        } else {
+            // Timer
+            if (timerStartRef.current) {
+                const diff = Math.floor((now - timerStartRef.current) / 1000);
+                const left = Math.max(0, targetDuration - diff);
+                
+                setRemaining(left);
+
+                if (left <= 0) {
+                    setIsRunning(false);
+                    // Only play in-app sound if app is active (foreground)
+                    if (AppState.currentState === 'active') {
+                        playCompleteSound();
+                    }
+                    timerStartRef.current = null;
+                }
+            }
+        }
+      }, 500); // Check more frequently than 1s to be accurate
+    } else {
+      // Paused
+      if (mode === 'stopwatch' && startTimeRef.current) {
+          pausedTimeRef.current = (Date.now() - startTimeRef.current) / 1000;
+          startTimeRef.current = null;
+      }
+      if (mode === 'timer' && timerStartRef.current) {
+           timerStartRef.current = null;
+      }
+    }
 
     return () => clearInterval(interval);
-  }, [isRunning, mode, targetDuration]);
+  }, [isRunning, mode, targetDuration]); // Intentionally exclude remaining to avoid re-interval
+
+  // Notification management
+  useEffect(() => {
+      if (isRunning && mode === 'timer' && remaining > 0) {
+          // Schedule notification
+          scheduleNotification(remaining);
+      } else {
+          // Cancel if paused or stopped or changed mode
+          Notifications.cancelAllScheduledNotificationsAsync();
+      }
+  }, [isRunning, mode]); // Re-schedule if these change. Note: remaining is not here to avoid spamming schedule, but we need meaningful initial value.
+
+  const scheduleNotification = async (seconds: number) => {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      
+      // Calculate validation logic
+      if (seconds <= 0) return;
+
+      const title = type === 'warmup' ? 'Lämmittely valmis!' : 'Jäähdyttely valmis!';
+      const body = 'Aika on täynnä. Palaa treeniin!';
+
+      await Notifications.scheduleNotificationAsync({
+          content: {
+              title,
+              body,
+              sound: true, 
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: {
+              seconds: seconds,
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              repeats: false,
+          }
+      });
+  };
 
   // Initialize adaptive default
   useEffect(() => {
       if (suggestion) {
-          // Optional: Pre-select something? Or just show the hint.
-          // User said "ehdota" (suggest). We can show it in UI.
+          // Optional
       }
   }, [suggestion]);
 
 
   const handleReset = () => {
+    setIsRunning(false);
+    Notifications.cancelAllScheduledNotificationsAsync();
+
+    // Reset refs
+    startTimeRef.current = null;
+    pausedTimeRef.current = 0;
+    timerStartRef.current = null;
+
     setElapsed(0);
     if (mode === 'timer') {
         setRemaining(targetDuration);
     }
-    setIsRunning(false);
   };
   
   // When switching modes or setting target
   useEffect(() => {
-      if (mode === 'timer') {
-          setRemaining(targetDuration);
-      } else {
-          // Stopwatch just shows 'elapsed'
-      }
-  }, [mode, targetDuration]);
+      // If switching mode, reset timers to be safe? Or keep running?
+      // Design decision: Resetting is safer to avoid confusion.
+      handleReset();
+  }, [mode]);
+
+  useEffect(() => {
+      setRemaining(targetDuration);
+      timerStartRef.current = null; // Invalidate start ref if target changes
+  }, [targetDuration]); // Only update remaining if target changes explicitly (not just tick)
 
   const handleComplete = () => {
+    // Determine duration based on mode
+    let finalDuration = elapsed;
+    if (mode === 'timer') {
+        // Calculate actually spent time in timer mode
+        finalDuration = targetDuration - remaining; 
+        if (finalDuration < 0) finalDuration = 0; 
+        // Or should we count total time spent even if timer used? 
+        // For simplicity, let's just use what user "did".
+    }
+
     onComplete({
-      duration: elapsed, // Always return actual time spent
+      duration: Math.max(elapsed, targetDuration - remaining), // naive approach
       method,
       intensity,
       notes,
@@ -179,15 +325,19 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
 
   // Helper for quick settings
   const setQuickTimer = (mins: number) => {
+      setIsRunning(false); // Pause first
       setMode('timer');
-      setTargetDuration(mins * 60);
-      setRemaining(mins * 60);
-      setIsRunning(true);
+      const seconds = mins * 60;
+      setTargetDuration(seconds);
+      setRemaining(seconds);
+      timerStartRef.current = null; // Reset ref
+      
+      setTimeout(() => {
+          setIsRunning(true);
+      }, 100);
   };
 
   // Calculate progress for circular indicator
-  // Stopwatch: Fill up 10 mins? Or just spin?
-  // Timer: 100% -> 0%
   let progress = 0;
   if (mode === 'timer') {
       progress = targetDuration > 0 ? remaining / targetDuration : 0;
@@ -225,7 +375,6 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
                 <Pressable 
                     style={styles.modeToggle}
                     onPress={() => {
-                        setIsRunning(false);
                         setMode(prev => prev === 'timer' ? 'stopwatch' : 'timer');
                     }}
                 >
@@ -318,11 +467,12 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
                   <Pressable 
                     style={styles.adjustBtn}
                     onPress={() => {
+                        setIsRunning(false);
                         setMode('timer');
                         const newTime = Math.max(30, targetDuration - 30);
                         setTargetDuration(newTime);
                         setRemaining(newTime);
-                        setIsRunning(false); 
+                        timerStartRef.current = null;
                     }}
                   >
                       <Minus size={20} color={Colors.text.primary} />
@@ -342,11 +492,12 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
                   <Pressable 
                     style={styles.adjustBtn}
                     onPress={() => {
+                        setIsRunning(false);
                         setMode('timer');
                         const newTime = targetDuration + 30;
                         setTargetDuration(newTime);
                         setRemaining(newTime);
-                        setIsRunning(false);
+                        timerStartRef.current = null;
                     }}
                   >
                       <Plus size={20} color={Colors.text.primary} />

@@ -25,6 +25,7 @@ import type { WorkoutExercise } from '@/types';
 import { Database } from '@/types/supabase';
 import { isOnline, addToQueue } from '@/lib/offlineSync';
 import { workoutHistoryKeys } from '@/hooks/useWorkoutHistory';
+import { workoutTemplateKeys } from '@/hooks/useWorkoutTemplate';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import Animated, { FadeIn, SlideInUp } from 'react-native-reanimated';
@@ -464,6 +465,7 @@ function WorkoutSessionContent({
     
     // Invalidate queries in any case
     await queryClient.invalidateQueries({ queryKey: ['workout_details', workoutId] });
+    await queryClient.invalidateQueries({ queryKey: workoutTemplateKeys.detail(workoutId) });
     await queryClient.invalidateQueries({ queryKey: ['workouts'] });
     await queryClient.invalidateQueries({ queryKey: workoutHistoryKeys.all });
 
@@ -515,8 +517,9 @@ function WorkoutSessionContent({
           });
 
           const completedSets = (workoutState.setResults[exIdx] || [])
-            .filter(r => r.completed)
-            .map((result) => ({
+            .map((result, resultIdx) => ({ result, resultIdx })) // Helper to keep index
+            .filter(({ result }) => result.completed)
+            .map(({ result, resultIdx }) => ({
               id: uuidv4(),
               session_exercise_id: exId,
               sets_completed: 1, // Individual set record
@@ -524,8 +527,9 @@ function WorkoutSessionContent({
               reps_completed: result.reps,
               rpe: result.rpe,
               notes: result.notes || null,
-              created_at: sessionDate,
+              created_at: sessionDate, // Use session date for consistency
               completed_at: new Date().toISOString(),
+              set_index: resultIdx // Use ORIGINAL index
             }));
 
           setsPayload.push(...completedSets);
@@ -632,8 +636,9 @@ function WorkoutSessionContent({
           });
 
           const completedSets = (workoutState.setResults[exIdx] || [])
-            .filter(r => r.completed)
-            .map((result) => ({
+            .map((result, resultIdx) => ({ result, resultIdx })) // Helper to keep index
+            .filter(({ result }) => result.completed)
+            .map(({ result, resultIdx }) => ({
               id: uuidv4(),
               session_exercise_id: exId,
               weight_used: result.weight,
@@ -643,6 +648,7 @@ function WorkoutSessionContent({
               completed_at: new Date().toISOString(),
               _offline: true,
               _pendingsync: true,
+              set_index: resultIdx // Use ORIGINAL index
             }));
 
           sessionSetsData.push(...completedSets);

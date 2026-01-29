@@ -41,6 +41,10 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { addToQueue } from "@/lib/offlineSync/syncQueue";
+import { processQueue } from "@/lib/offlineSync/syncEngine";
+import { isOnline } from "@/lib/offlineSync/networkStatus";
+import { workoutTemplateKeys } from "@/hooks/useWorkoutTemplate";
 import { ExercisePickerModal } from "@/components/workout/ExercisePickerModal";
 import DraggableFlatList, {
   ScaleDecorator,
@@ -785,6 +789,7 @@ const safeParseFloat = (val: string | undefined | null, defaultVal: number = 0):
 
 // Inside handleSave...
       const formattedExercises = exercises.map((ex, index) => ({
+        id: ex.id.includes('-') ? ex.id : undefined, // Safe check for UUID (has dashes) vs temp ID (math.random)
         name: ex.name || t('workouts.unnamed_exercise'),
         category: ex.category || null,
         order_index: index,
@@ -792,7 +797,7 @@ const safeParseFloat = (val: string | undefined | null, defaultVal: number = 0):
           reps: safeParseInt(block.reps, 0),
           weight: block.isBodyweight ? 0 : safeParseFloat(block.weight, 0),
           rest_time: safeParseInt(block.restTime, 60),
-          restTime: safeParseInt(block.restTime, 60), // Redundant key for legacy RPC support
+          restTime: safeParseInt(block.restTime, 60), 
           isBodyweight: block.isBodyweight,
           target_type: block.targetType,
           sets: 1, 
@@ -801,58 +806,62 @@ const safeParseFloat = (val: string | undefined | null, defaultVal: number = 0):
       }));
 
       if (id) {
-        await supabase.from("workouts").update({
-          program: programName,
-          workout_type: workoutType,
-          notes: notes,
-        }).eq("id", id);
-
-        await supabase.from("exercises").delete().eq("workout_id", id);
-
-        for (const ex of formattedExercises) {
-          const { data: exData, error: exError } = await supabase.from("exercises").insert({
-            workout_id: id,
-            name: ex.name,
-            category: ex.category,
-            order_index: ex.order_index
-          }).select().single();
-
-          if (exError) throw exError;
-
-          const setsToInsert = ex.sets.map(s => ({
-            exercise_id: exData.id,
-            reps: s.reps,
-            weight: s.weight,
-            rest_time: s.rest_time, 
-            rpe: s.rpe,
-            target_type: s.target_type,
-            is_bodyweight: s.isBodyweight, // Map camelCase from state to snake_case DB column
-            sets: s.sets
-          }));
-
-          if (setsToInsert.length > 0) {
-            await supabase.from("exercise_sets").insert(setsToInsert);
-          }
-        }
-      } else {
-        const { error } = await supabase.rpc('insert_workout_with_children', {
-          p_date: new Date().toISOString(),
-          p_duration: 60 * 60,
-          p_exercises: formattedExercises,
-          p_feeling: 3,
-          p_notes: notes,
-          p_program: programName,
-          p_progression: "maintain",
-          p_progression_percentage: "0",
-          p_user_id: user?.id || "",
-          p_workout_type: workoutType
+        // SMART UPDATE (Offline First)
+        await addToQueue({
+            id: id,
+            type: 'workout_template_update',
+            operation: 'update',
+            data: {
+                is_edit: true,
+                is_new: false, // Flag for sync engine
+                program: programName,
+                workout_type: workoutType,
+                notes: notes,
+                exercises: formattedExercises
+            }
         });
-
-        if (error) throw error;
+      } else {
+        // CREATE NEW (Offline First)
+        // We generate a temp ID for the queue if needed, but here we just need a unique key.
+        // For actual creation, syncEngine handles it.
+        // Ideally we should use a generated UUID for 'id' here if we want to link sessions.
+        // But for now, we use a random ID for the queue item.
+        const tempId = Math.random().toString(36).substring(7);
+        
+        await addToQueue({
+            id: tempId,
+            type: 'workout_template_update', // reusing type
+            operation: 'insert',
+            data: {
+                is_edit: false,
+                is_new: true, // Flag for sync engine
+                date: new Date().toISOString(),
+                duration: 60 * 60,
+                exercises: formattedExercises,
+                feeling: 3,
+                notes: notes,
+                program: programName,
+                progression: "maintain",
+                progression_percentage: "0",
+                user_id: user?.id || "",
+                workout_type: workoutType
+            }
+        });
       }
 
+      // Optimistic Sync Attempt
+      // We try to process queue immediately. 
+      // If offline or fails, it stays in queue. 
+      // If online, it syncs.
+      // We don't await the result blocking UI too much, or we do?
+      // Better to just trigger it and go back.
+      processQueue().catch(err => console.log('Background sync error', err));
+
       await queryClient.invalidateQueries({ queryKey: ['workouts'] });
-      if (id) await queryClient.invalidateQueries({ queryKey: ['workout_details', id] });
+      if (id) {
+        await queryClient.invalidateQueries({ queryKey: ['workout_details', id] });
+        await queryClient.invalidateQueries({ queryKey: workoutTemplateKeys.detail(id) });
+      }
       
       router.back();
     } catch (error) {
