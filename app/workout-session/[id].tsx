@@ -745,16 +745,16 @@ function WorkoutSessionContent({
         onOpenMenu={() => setReorderModalVisible(true)}
       />
       
-      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-        <LiveHeartRate />
-      </View>
-      
       <WorkoutProgressBar
         sessionExercises={exercises}
         currentExerciseIndex={workoutState.currentExerciseIndex}
         currentSetIndex={workoutState.currentSetIndex}
         setResults={workoutState.setResults}
       />
+      
+      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+        <LiveHeartRate />
+      </View>
 
       <ScrollView 
         style={styles.scrollView}

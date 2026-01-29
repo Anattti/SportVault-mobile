@@ -10,17 +10,13 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  TextInput,
   Modal,
-  Keyboard,
-  TouchableWithoutFeedback,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   AppState,
 } from 'react-native';
 import { Play, Pause, RotateCcw, Check, ChevronDown, Timer, History, BellRing, Plus, Minus } from 'lucide-react-native';
-import { RPESlider } from './session/RPESlider';
+import { LiveHeartRate } from './LiveHeartRate';
 import { Colors } from '@/constants/Colors';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
@@ -119,8 +115,6 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
   }, [isRunning]);
 
   const [method, setMethod] = useState<WarmupMethod>('juoksumatto');
-  const [intensity, setIntensity] = useState<WarmupIntensity>(5);
-  const [notes, setNotes] = useState('');
   const [showMethodPicker, setShowMethodPicker] = useState(false);
 
   const isWarmup = type === 'warmup';
@@ -310,8 +304,8 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
     onComplete({
       duration: Math.max(elapsed, targetDuration - remaining), // naive approach
       method,
-      intensity,
-      notes,
+      intensity: 5, // Default/Hidden
+      notes: '',    // Default/Hidden
       skipped: false,
     });
   };
@@ -355,16 +349,11 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
   const size = halfSize * 2;
 
   const content = (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
-    >
       <ScrollView 
         style={[styles.container, overlay && styles.overlayContainer]}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <View style={{ flex: 1 }}>
             {/* Header Area */}
             <View style={styles.header}>
@@ -385,16 +374,12 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
                     )}
                 </Pressable>
             </View>
-            
-            {/* Adaptive Suggestion Hint */}
-            {suggestion && (
-                <View style={styles.suggestionContainer}>
-                    <BellRing size={14} color={Colors.neon.DEFAULT} />
-                    <Text style={styles.suggestionText}>
-                        Suositus: {suggestion.label}
-                    </Text>
-                </View>
-            )}
+      
+
+            {/* Heart Rate Monitor */}
+            <View style={{ marginBottom: 32 }}>
+              <LiveHeartRate />
+            </View>
 
             {/* Circular Timer */}
             <View style={styles.timerContainer}>
@@ -563,30 +548,6 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
               </View>
             )}
 
-            {/* Intensity Selector - Replaced with RPE Slider */}
-            <View style={{ marginBottom: 24 }}>
-                <RPESlider
-                    value={intensity}
-                    onChange={setIntensity}
-                />
-            </View>
-
-            {/* Notes */}
-            <View style={styles.notesContainer}>
-              <Text style={styles.notesLabel}>{t('session.warmup.notes')}</Text>
-              <TextInput
-                style={styles.notesInput}
-                placeholder={t('session.warmup.notes_placeholder')}
-                placeholderTextColor="rgba(255,255,255,0.3)"
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                returnKeyType="done"
-                blurOnSubmit={true}
-                onSubmitEditing={Keyboard.dismiss}
-              />
-            </View>
-
             {/* Bottom Actions */}
             <View style={styles.actions}>
               <Pressable style={styles.skipButton} onPress={onSkip}>
@@ -599,9 +560,7 @@ export function WarmupPhase({ type, visible, onComplete, onSkip, overlay = false
               </Pressable>
             </View>
           </View>
-        </TouchableWithoutFeedback>
       </ScrollView>
-    </KeyboardAvoidingView>
   );
 
   if (overlay) return content;

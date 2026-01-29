@@ -76,7 +76,8 @@
           "stopOnTerminate": false,
           "startOnBoot": true
         }
-      ]
+      ],
+      "./plugins/withRemoveiOSNotificationEntitlement"
     ]
   }
 }

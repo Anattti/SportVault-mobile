@@ -3,6 +3,11 @@ export const Colors = {
   // Brand Identity Colors
   neon: {
     DEFAULT: "#00FF41", // Primary Neon Green
+    green: "#00FF41",   // Alias for consistency
+    blue: "#00f3ff",    // Neon Blue/Cyan
+    red: "#ff003c",     // Neon Red/Pink
+    yellow: "#ffea00",  // Neon Yellow
+    orange: "#ff9100",  // Neon Orange
     dim: "rgba(0, 255, 65, 0.5)",
     faint: "rgba(0, 255, 65, 0.1)",
     border: "rgba(0, 255, 65, 0.5)",
