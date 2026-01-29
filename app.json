@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "sportvault-mobile",
-    "slug": "sportvault-mobile",
+    "slug": "sportvault",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -42,13 +42,6 @@
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
-        "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH_SCAN",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.WAKE_LOCK"
       ],
       "package": "com.antti.sportvault"
@@ -78,6 +71,13 @@
         }
       ],
       "./plugins/withRemoveiOSNotificationEntitlement"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4bf61006-73a9-4239-8daa-f92638e122c7"
+      }
+    },
+    "owner": "anattti"
   }
 }
